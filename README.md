@@ -2,6 +2,9 @@
 
 COMRAD means Compute Orchestrator for Model Routing, Allocation and Dispatch.
 
+<img width="1507" height="845" alt="image" src="https://github.com/user-attachments/assets/6a54243e-f67b-44d2-9080-72b49d507e45" />
+
+
 COMRAD is a small control plane for running local LLM inference on shared machines. It gives clients an OpenAI-compatible API, gives operators a dashboard, and sends each request to a Worker that has the right model ready.
 
 Use COMRAD when you want to:
