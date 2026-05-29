@@ -1,0 +1,572 @@
+import { useState } from "react"
+
+import {
+  ActivityIcon,
+  HardDriveIcon,
+  MemoryStickIcon,
+  Trash2Icon,
+} from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
+import { ConditionList, conditionSummary } from "@/components/comrad/conditions"
+import { KeyValues, PageTitle } from "@/components/comrad/dashboard-primitives"
+import { StatusBadge } from "@/components/comrad/status-badge"
+import { useI18n, type TFunction } from "@/i18n/i18n-provider"
+import { fmtBytes, human, short, timeAgo } from "@/lib/comrad"
+import {
+  drainNode,
+  enableNode,
+  evictWorkerArtifact,
+  unbanNode,
+  unbanSlot,
+  type Actions,
+} from "@/comrad/actions"
+import type { ArtifactEvictionRecord, Node, Slot, StateResponse } from "@/types"
+
+export function NodesPage({
+  state,
+  actions,
+}: {
+  state: StateResponse
+  actions: Actions
+}) {
+  const { t } = useI18n()
+  const nodes = state.nodes ?? []
+  const [detailNodeId, setDetailNodeId] = useState("")
+  const detailNode = nodes.find((node) => node.nodeId === detailNodeId)
+  return (
+    <>
+      <PageTitle
+        eyebrow={t("nav.group.serve", undefined, "Resources")}
+        title={t("nodes.title", undefined, "Workers")}
+        description={t(
+          "nodes.description",
+          undefined,
+          "Worker machines, ready slots, resources, and the reason a worker is or is not used."
+        )}
+      />
+      {!nodes.length ? (
+        <Card>
+          <CardContent className="py-8 text-sm text-muted-foreground">
+            {t("nodes.empty", undefined, "No workers are connected yet.")}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {nodes.map((node) => (
+            <NodeCard
+              key={node.nodeId}
+              node={node}
+              slots={(state.slots ?? []).filter(
+                (slot) => slot.nodeId === node.nodeId
+              )}
+              actions={actions}
+              openDetails={() => setDetailNodeId(node.nodeId)}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
+      <NodeTechnicalDetailsDialog
+        node={detailNode}
+        evictionRecords={(state.artifactEvictions ?? []).filter(
+          (record) => record.nodeId === detailNodeId
+        )}
+        actions={actions}
+        open={detailNodeId !== ""}
+        setOpen={(open) => !open && setDetailNodeId("")}
+        t={t}
+      />
+    </>
+  )
+}
+
+function NodeCard({
+  node,
+  slots,
+  actions,
+  openDetails,
+  t,
+}: {
+  node: Node
+  slots: Slot[]
+  actions: Actions
+  openDetails: () => void
+  t: TFunction
+}) {
+  const reason = reasonForNode(node, slots, t)
+  const readySlots = slots.filter(
+    (slot) =>
+      slot.state === "ready" && slot.acceptsNewTasks && !slot.quarantined
+  ).length
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="truncate">
+              {node.name || short(node.nodeId)}
+            </CardTitle>
+            <CardDescription>
+              {node.os || "-"} / {node.arch || "-"} / {node.target || "-"}
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge
+              value={node.quarantined ? "quarantined" : node.state}
+            />
+            <StatusBadge value={node.mode} />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="rounded-lg border bg-muted/50 p-3">
+          <div className="text-sm font-medium">
+            {t(
+              "nodes.canServe.title",
+              undefined,
+              "Can this worker serve work?"
+            )}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{reason}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <ResourceStat
+            icon={ActivityIcon}
+            label={t("nodes.metric.readySlots", undefined, "Ready slots")}
+            value={`${readySlots}/${slots.length}`}
+          />
+          <ResourceStat
+            icon={MemoryStickIcon}
+            label={t("nodes.metric.memory", undefined, "Memory")}
+            value={fmtBytes(
+              node.budgets?.unifiedMemoryBytes || node.budgets?.ramBytes
+            )}
+          />
+          <ResourceStat
+            icon={HardDriveIcon}
+            label={t("nodes.metric.disk", undefined, "Disk")}
+            value={fmtBytes(node.budgets?.diskBytes)}
+          />
+        </div>
+        <Separator />
+        <SlotList slots={slots} actions={actions} t={t} />
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={openDetails}>
+            {t("nodes.technicalDetails", undefined, "Technical details")}
+          </Button>
+          {node.mode === "disabled" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => enableNode(node.nodeId, actions)}
+            >
+              {t("nodes.action.enable", undefined, "Enable worker")}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => drainNode(node.nodeId, actions)}
+            >
+              {t("nodes.action.drain", undefined, "Drain worker")}
+            </Button>
+          )}
+          {node.quarantined ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => unbanNode(node.nodeId, actions)}
+            >
+              {t(
+                "nodes.action.unbanAfterHealthcheck",
+                undefined,
+                "Unban after healthcheck"
+              )}
+            </Button>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function NodeTechnicalDetailsDialog({
+  node,
+  evictionRecords,
+  actions,
+  open,
+  setOpen,
+  t,
+}: {
+  node?: Node
+  evictionRecords: ArtifactEvictionRecord[]
+  actions: Actions
+  open: boolean
+  setOpen: (open: boolean) => void
+  t: TFunction
+}) {
+  if (!node) return null
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-[720px]">
+        <DialogHeader>
+          <DialogTitle>{node.name || short(node.nodeId)}</DialogTitle>
+          <DialogDescription>
+            {t(
+              "nodes.technicalDetails.description",
+              undefined,
+              "Worker identity, adapters, cache, warm models, and failure context."
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <KeyValues
+          values={[
+            [t("nodes.field.workerId", undefined, "Worker id"), node.nodeId],
+            [
+              t("nodes.field.adapters", undefined, "Adapters"),
+              node.runtimeAdapters?.join(", ") || "-",
+            ],
+            [
+              t("nodes.field.cachedArtifacts", undefined, "Cached artifacts"),
+              String(node.cachedArtifacts?.length || 0),
+            ],
+            [
+              t("nodes.field.readyModels", undefined, "Ready models"),
+              node.warmProfiles?.map(short).join(", ") || "-",
+            ],
+            [
+              t("nodes.field.lastFailure", undefined, "Last failure"),
+              node.lastFailure || "-",
+            ],
+            [
+              t("nodes.field.quarantine", undefined, "Quarantine"),
+              node.quarantineReason || "-",
+            ],
+            [
+              t(
+                "nodes.field.quarantineUntil",
+                undefined,
+                "Quarantine expiration"
+              ),
+              node.quarantineUntil || "-",
+            ],
+          ]}
+        />
+        <div className="grid gap-4">
+          <div>
+            <div className="mb-2 text-sm font-medium">
+              {t("nodes.conditions.title", undefined, "Worker conditions")}
+            </div>
+            <ConditionList
+              conditions={node.conditions}
+              empty={t(
+                "nodes.conditions.empty",
+                undefined,
+                "No Worker conditions reported."
+              )}
+              t={t}
+            />
+          </div>
+          <CachedArtifactList
+            node={node}
+            evictionRecords={evictionRecords}
+            actions={actions}
+            t={t}
+          />
+          <CacheCleanupList records={evictionRecords} t={t} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CachedArtifactList({
+  node,
+  evictionRecords,
+  actions,
+  t,
+}: {
+  node: Node
+  evictionRecords: ArtifactEvictionRecord[]
+  actions: Actions
+  t: TFunction
+}) {
+  const artifacts = node.cachedArtifacts ?? []
+  if (!artifacts.length) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("nodes.cache.empty", undefined, "No cached artifacts reported.")}
+      </p>
+    )
+  }
+  const canEvict = node.state === "online"
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-sm font-medium">
+        {t("nodes.cache.title", undefined, "Cached artifacts")}
+      </div>
+      {artifacts.map((artifactId) => {
+        const latestEviction = latestArtifactEviction(
+          evictionRecords,
+          artifactId
+        )
+        return (
+          <div
+            key={artifactId}
+            className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="min-w-0">
+              <code className="block truncate">{short(artifactId)}</code>
+              <ArtifactEvictionInline record={latestEviction} t={t} />
+            </div>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={!canEvict}
+              title={
+                canEvict
+                  ? t(
+                      "nodes.action.evictArtifact",
+                      undefined,
+                      "Remove from worker"
+                    )
+                  : t(
+                      "nodes.cache.workerOffline",
+                      undefined,
+                      "Worker must be online to remove cached files"
+                    )
+              }
+              onClick={() =>
+                evictWorkerArtifact(node.nodeId, artifactId, actions)
+              }
+            >
+              <Trash2Icon data-icon="inline-start" />
+              {t("nodes.action.evictArtifact", undefined, "Remove from worker")}
+            </Button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function CacheCleanupList({
+  records,
+  t,
+}: {
+  records: ArtifactEvictionRecord[]
+  t: TFunction
+}) {
+  const visible = [...records]
+    .sort((a, b) => timeSortValue(b.updatedAt) - timeSortValue(a.updatedAt))
+    .slice(0, 8)
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-sm font-medium">
+        {t("nodes.cacheCleanup.title", undefined, "Cache cleanup")}
+      </div>
+      {!visible.length ? (
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "nodes.cacheCleanup.empty",
+            undefined,
+            "No cache cleanup requests reported yet."
+          )}
+        </p>
+      ) : (
+        visible.map((record) => (
+          <div
+            key={record.evictionId}
+            className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_auto] sm:items-center"
+          >
+            <div className="min-w-0">
+              <code className="block truncate">{short(record.artifactId)}</code>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>{human(record.reason, t)}</span>
+                {record.failure ? (
+                  <span>{human(record.failure, t)}</span>
+                ) : null}
+                <span>{timeAgo(record.updatedAt, t)}</span>
+              </div>
+            </div>
+            <StatusBadge value={record.status} />
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
+function ArtifactEvictionInline({
+  record,
+  t,
+}: {
+  record?: ArtifactEvictionRecord
+  t: TFunction
+}) {
+  if (!record) return null
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      <span>{t("nodes.cacheCleanup.latest", undefined, "Last cleanup")}</span>
+      <StatusBadge value={record.status} />
+      <span>{human(record.reason, t)}</span>
+      {record.failure ? <span>{human(record.failure, t)}</span> : null}
+    </div>
+  )
+}
+
+function latestArtifactEviction(
+  records: ArtifactEvictionRecord[],
+  artifactId: string
+) {
+  return records
+    .filter((record) => record.artifactId === artifactId)
+    .sort((a, b) => timeSortValue(b.updatedAt) - timeSortValue(a.updatedAt))[0]
+}
+
+function timeSortValue(value?: string) {
+  if (!value) return 0
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function ResourceStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof ActivityIcon
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon data-icon="inline-start" />
+        {label}
+      </div>
+      <div className="mt-2 truncate font-medium">{value}</div>
+    </div>
+  )
+}
+
+function SlotList({
+  slots,
+  actions,
+  t,
+}: {
+  slots: Slot[]
+  actions: Actions
+  t: TFunction
+}) {
+  if (!slots.length)
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("nodes.slots.empty", undefined, "No execution slots reported.")}
+      </p>
+    )
+  return (
+    <div className="flex flex-col gap-2">
+      {slots.map((slot) => (
+        <div
+          key={slot.slotId}
+          className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[1fr_120px_1.2fr_auto] lg:items-center"
+        >
+          <div className="min-w-0">
+            <div className="font-medium">
+              {slot.logicalModel ||
+                t("nodes.slots.noModel", undefined, "No model loaded")}
+            </div>
+            <div className="font-mono text-xs text-muted-foreground">
+              {short(slot.slotId)}
+            </div>
+          </div>
+          <StatusBadge value={slot.quarantined ? "quarantined" : slot.state} />
+          <div className="text-sm text-muted-foreground">
+            {conditionSummary(
+              slot.conditions,
+              "Ready",
+              t,
+              human(
+                slot.mismatchReason ||
+                  slot.quarantineReason ||
+                  slot.lastFailure ||
+                  (slot.acceptsNewTasks
+                    ? "ready for new tasks"
+                    : "not accepting new tasks"),
+                t
+              )
+            )}
+          </div>
+          {slot.quarantined ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => unbanSlot(slot.slotId, actions)}
+            >
+              {t("nodes.action.unban", undefined, "Unban")}
+            </Button>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function reasonForNode(node: Node, slots: Slot[], t: TFunction) {
+  if (!node.approved)
+    return t(
+      "nodes.reason.notApproved",
+      undefined,
+      "Worker is not approved, so COMRAD will not schedule requests here."
+    )
+  if (node.mode === "disabled" || node.state === "disabled")
+    return t("nodes.reason.disabled", undefined, "Worker is disabled.")
+  if (node.quarantined)
+    return (
+      node.quarantineReason ||
+      t(
+        "nodes.reason.quarantined",
+        undefined,
+        "Worker is quarantined after repeated failures."
+      )
+    )
+  if (node.updateRequired)
+    return t(
+      "nodes.reason.updateRequired",
+      undefined,
+      "Worker has a pending software update."
+    )
+  if (
+    !slots.some(
+      (slot) =>
+        slot.state === "ready" && slot.acceptsNewTasks && !slot.quarantined
+    )
+  )
+    return t(
+      "nodes.reason.noReadySlot",
+      undefined,
+      "No ready slot is currently available."
+    )
+  return t(
+    "nodes.reason.ready",
+    undefined,
+    "Yes. At least one slot is ready and accepting new requests."
+  )
+}

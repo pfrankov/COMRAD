@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export COMRAD_MANAGER_URL="${COMRAD_MANAGER_URL:-http://127.0.0.1:1922}"
+export COMRAD_WORKER_TOKEN="${COMRAD_WORKER_TOKEN:-dev-worker-token}"
+export COMRAD_WORKER_STATE_PATH="${COMRAD_WORKER_STATE_PATH:-$ROOT/data/worker-state.json}"
+export COMRAD_WORKER_CACHE_DIR="${COMRAD_WORKER_CACHE_DIR:-$ROOT/data/worker-cache}"
+export COMRAD_WORKER_UNIFIED_BYTES="${COMRAD_WORKER_UNIFIED_BYTES:-8589934592}"
+export COMRAD_WORKER_DISK_BYTES="${COMRAD_WORKER_DISK_BYTES:-21474836480}"
+
+exec "$ROOT/bin/comrad-worker"

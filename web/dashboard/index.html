@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a84ff'/%3E%3Cpath d='M9 17l4 4 10-11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>COMRAD Manager</title>
+    <script>
+      window.__COMRAD_SYSTEM_LOCALE__ = ""
+      ;(() => {
+        try {
+          const stored = localStorage.getItem("comrad.theme")
+          const theme = ["light", "dark", "system"].includes(stored)
+            ? stored
+            : "system"
+          const resolved =
+            theme === "system"
+              ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+              : theme
+          document.documentElement.classList.add(resolved)
+          document.documentElement.style.colorScheme = resolved
+          const storedLocale = localStorage.getItem("comrad.locale")
+          const locales = ["en", "zh", "es", "fr", "ru", "de", "ja", "pt"]
+          const normalizeLocale = (value) => {
+            const base = String(value || "")
+              .toLowerCase()
+              .replace("_", "-")
+              .split("-")[0]
+            if (base === "zh" || base === "pt") return base
+            return locales.includes(base) ? base : ""
+          }
+          const primaryLocale = normalizeLocale(
+            (navigator.languages && navigator.languages[0]) ||
+              navigator.language
+          )
+          const intlLocale = normalizeLocale(
+            Intl.DateTimeFormat().resolvedOptions().locale
+          )
+          const serverLocale = normalizeLocale(window.__COMRAD_SYSTEM_LOCALE__)
+          const resolvedLocale = locales.includes(storedLocale)
+            ? storedLocale
+            : primaryLocale || intlLocale || serverLocale || "en"
+          document.documentElement.lang = resolvedLocale
+        } catch {
+          document.documentElement.classList.add("light")
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
