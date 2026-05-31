@@ -29,6 +29,7 @@ export type Node = {
   budgets?: ResourceBudget
   cachedArtifacts?: string[]
   warmProfiles?: string[]
+  lastSeen?: string
   approved?: boolean
   updateRequired?: boolean
   updateStatus?: string
@@ -185,6 +186,26 @@ export type Assignment = {
   actualWarm?: boolean
   ready?: boolean
   mismatchReason?: string
+}
+
+export type Policy = {
+  policyId: string
+  profileId: string
+  cachedCount?: number
+  warmCount?: number
+  autoBalance?: boolean
+  minCachedCount?: number
+  maxCachedCount?: number
+  minWarmCount?: number
+  maxWarmCount?: number
+  maxCachedProfilesPerNode?: number
+  maxWarmProfilesPerNode?: number
+  effectiveCachedCount?: number
+  effectiveWarmCount?: number
+  demandQueued?: number
+  demandRunning?: number
+  demandRecent?: number
+  conditions?: Condition[]
 }
 
 export type FitResult = {
@@ -348,6 +369,7 @@ export type StateResponse = {
   artifacts?: Artifact[]
   artifactEvictions?: ArtifactEvictionRecord[]
   profiles?: Profile[]
+  policies?: Policy[]
   assignments?: Assignment[]
   fitMatrix?: FitResult[]
   runtimeSummary?: RuntimeSummary

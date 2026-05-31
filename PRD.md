@@ -119,6 +119,8 @@ The Manager must:
 
 - build profile-by-slot fit results;
 - explain why a profile does not fit a slot;
+- plan model capacity globally across Worker memory and disk budgets;
+- support opt-in per-model auto-balance within admin-configured min/max downloaded and ready copy limits;
 - schedule only `ready` slots;
 - never assign two active tasks to one slot;
 - queue requests when no compatible ready slot is available;
@@ -127,6 +129,7 @@ The Manager must:
 - retry only before first output;
 - fail the stream after first output failure;
 - exclude previously failed slots from automatic retry for the same task;
+- mark silent Worker connections offline after missed heartbeats and replan capacity;
 - quarantine Workers or slots that repeatedly report ready but fail execution;
 - keep quarantined slots out of scheduling;
 - expose quarantine reason, counters, last failure, and expiration;
@@ -196,6 +199,8 @@ The dashboard must expose:
 
 - logical model identity and concrete runtime variant/artifact;
 - upload progress for long model-file uploads, including percentage and speed;
+- auto-balance controls with effective desired counts and demand signals;
+- node remaining planned RAM/disk and offline last-seen reasons;
 - model deletion and selected-Worker stale cache removal;
 - stale cache cleanup history and status per Worker;
 - desired vs actual placement;

@@ -22,11 +22,12 @@ func buildCachePlan(db Database, profile WorkloadProfile, policy PlacementPolicy
 	artifacts := profileArtifactIDs(profile)
 	desiredNodes := desiredCacheNodes(db, profile.ID)
 	workers := cacheWorkerStatuses(db, profile, artifacts, desiredNodes)
+	capacity := EffectivePolicyCapacity(db, policy, time.Now().UTC())
 	plan := CachePlan{
 		ProfileRef:       profile.ID,
 		Artifacts:        artifacts,
 		RequireTags:      cachePlanRequireTags(profile, policy),
-		DesiredCopies:    desiredCachedCount(policy),
+		DesiredCopies:    capacity.Cached,
 		EvictionsPending: pendingEvictionsForArtifacts(db, artifacts),
 		Workers:          workers,
 	}

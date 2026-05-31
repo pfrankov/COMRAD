@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Toggle } from "@/components/ui/toggle"
 import { ConditionList } from "@/components/comrad/conditions"
 import { DataTable } from "@/components/comrad/data-table"
 import { DryRun, PageTitle } from "@/components/comrad/dashboard-primitives"
@@ -33,7 +34,13 @@ import { StatusBadge } from "@/components/comrad/status-badge"
 import { useI18n, type TFunction } from "@/i18n/i18n-provider"
 import { assignmentCounts, human, profileLabel, short } from "@/lib/comrad"
 import { savePolicy, type Actions } from "@/comrad/actions"
-import type { CachePlan, CacheWorkerStatus, FitResult, StateResponse } from "@/types"
+import type {
+  CachePlan,
+  CacheWorkerStatus,
+  FitResult,
+  Policy,
+  StateResponse,
+} from "@/types"
 
 export function PlacementPage({
   state,
@@ -51,6 +58,13 @@ export function PlacementPage({
   const [preferred, setPreferred] = useState("")
   const [denied, setDenied] = useState("")
   const [pins, setPins] = useState("")
+  const [autoBalance, setAutoBalance] = useState(false)
+  const [minCachedCount, setMinCachedCount] = useState("")
+  const [maxCachedCount, setMaxCachedCount] = useState("")
+  const [minWarmCount, setMinWarmCount] = useState("")
+  const [maxWarmCount, setMaxWarmCount] = useState("")
+  const [maxCachedProfilesPerNode, setMaxCachedProfilesPerNode] = useState("")
+  const [maxWarmProfilesPerNode, setMaxWarmProfilesPerNode] = useState("")
   const [advanced, setAdvanced] = useState(false)
 
   const assignments = useMemo(
@@ -65,14 +79,31 @@ export function PlacementPage({
     () => (state.cachePlans ?? []).find((item) => item.profileRef === profileId),
     [state.cachePlans, profileId]
   )
+  const selectedPolicy = useMemo(
+    () => (state.policies ?? []).find((item) => item.profileId === profileId),
+    [state.policies, profileId]
+  )
   useEffect(() => {
     if (!profileId && firstProfile) setProfileId(firstProfile)
   }, [firstProfile, profileId])
   useEffect(() => {
     const counts = assignmentCounts(profileId, assignments)
-    if (counts.desiredCached) setCachedCount(String(counts.desiredCached))
-    if (counts.desiredWarm) setWarmCount(String(counts.desiredWarm))
-  }, [assignments, profileId])
+    setCachedCount(
+      String(selectedPolicy?.cachedCount ?? (counts.desiredCached || 1))
+    )
+    setWarmCount(String(selectedPolicy?.warmCount ?? (counts.desiredWarm || 1)))
+    setAutoBalance(Boolean(selectedPolicy?.autoBalance))
+    setMinCachedCount(countField(selectedPolicy?.minCachedCount))
+    setMaxCachedCount(countField(selectedPolicy?.maxCachedCount))
+    setMinWarmCount(countField(selectedPolicy?.minWarmCount))
+    setMaxWarmCount(countField(selectedPolicy?.maxWarmCount))
+    setMaxCachedProfilesPerNode(
+      countField(selectedPolicy?.maxCachedProfilesPerNode)
+    )
+    setMaxWarmProfilesPerNode(
+      countField(selectedPolicy?.maxWarmProfilesPerNode)
+    )
+  }, [assignments, profileId, selectedPolicy])
 
   return (
     <>
@@ -136,7 +167,7 @@ export function PlacementPage({
                   )}
                 </FieldDescription>
               </Field>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <Field>
                   <FieldLabel>
                     {t(
@@ -155,6 +186,31 @@ export function PlacementPage({
                       "placement.downloadedCopies.description",
                       undefined,
                       "How many workers should keep the artifact on disk."
+                    )}
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>
+                    {t(
+                      "placement.field.autoBalance",
+                      undefined,
+                      "Auto balance"
+                    )}
+                  </FieldLabel>
+                  <Toggle
+                    variant="outline"
+                    pressed={autoBalance}
+                    onPressedChange={setAutoBalance}
+                  >
+                    {autoBalance
+                      ? t("common.on", undefined, "On")
+                      : t("common.off", undefined, "Off")}
+                  </Toggle>
+                  <FieldDescription>
+                    {t(
+                      "placement.autoBalance.description",
+                      undefined,
+                      "Raise or lower effective ready copies from recent demand."
                     )}
                   </FieldDescription>
                 </Field>
@@ -180,6 +236,62 @@ export function PlacementPage({
                   </FieldDescription>
                 </Field>
               </div>
+              {autoBalance ? (
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Field>
+                    <FieldLabel>
+                      {t("placement.field.minReady", undefined, "Min ready")}
+                    </FieldLabel>
+                    <Input
+                      type="number"
+                      value={minWarmCount}
+                      onChange={(event) => setMinWarmCount(event.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel>
+                      {t("placement.field.maxReady", undefined, "Max ready")}
+                    </FieldLabel>
+                    <Input
+                      type="number"
+                      value={maxWarmCount}
+                      onChange={(event) => setMaxWarmCount(event.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel>
+                      {t(
+                        "placement.field.minDownloaded",
+                        undefined,
+                        "Min downloaded"
+                      )}
+                    </FieldLabel>
+                    <Input
+                      type="number"
+                      value={minCachedCount}
+                      onChange={(event) =>
+                        setMinCachedCount(event.target.value)
+                      }
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel>
+                      {t(
+                        "placement.field.maxDownloaded",
+                        undefined,
+                        "Max downloaded"
+                      )}
+                    </FieldLabel>
+                    <Input
+                      type="number"
+                      value={maxCachedCount}
+                      onChange={(event) =>
+                        setMaxCachedCount(event.target.value)
+                      }
+                    />
+                  </Field>
+                </div>
+              ) : null}
               <Button variant="outline" onClick={() => setAdvanced(!advanced)}>
                 {advanced
                   ? t(
@@ -250,6 +362,40 @@ export function PlacementPage({
                       placeholder="node-id/metal0"
                     />
                   </Field>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel>
+                        {t(
+                          "placement.field.maxWarmPerWorker",
+                          undefined,
+                          "Max warm models per worker"
+                        )}
+                      </FieldLabel>
+                      <Input
+                        type="number"
+                        value={maxWarmProfilesPerNode}
+                        onChange={(event) =>
+                          setMaxWarmProfilesPerNode(event.target.value)
+                        }
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel>
+                        {t(
+                          "placement.field.maxCachedPerWorker",
+                          undefined,
+                          "Max downloaded models per worker"
+                        )}
+                      </FieldLabel>
+                      <Input
+                        type="number"
+                        value={maxCachedProfilesPerNode}
+                        onChange={(event) =>
+                          setMaxCachedProfilesPerNode(event.target.value)
+                        }
+                      />
+                    </Field>
+                  </div>
                 </div>
               ) : null}
             </FieldGroup>
@@ -265,7 +411,14 @@ export function PlacementPage({
                     tags,
                     preferred,
                     denied,
-                    pins
+                    pins,
+                    autoBalance,
+                    minCachedCount,
+                    maxCachedCount,
+                    minWarmCount,
+                    maxWarmCount,
+                    maxCachedProfilesPerNode,
+                    maxWarmProfilesPerNode
                   )
                 }
               >
@@ -294,6 +447,22 @@ export function PlacementPage({
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
+            <DryRun
+              title={t(
+                "placement.preview.effectiveDesired",
+                undefined,
+                "Effective desired"
+              )}
+              items={[effectiveDesiredText(selectedPolicy, cachedCount, warmCount, t)]}
+            />
+            <DryRun
+              title={t(
+                "placement.preview.demandSignal",
+                undefined,
+                "Demand signal"
+              )}
+              items={[demandSignalText(selectedPolicy, t)]}
+            />
             <DryRun
               title={t(
                 "placement.preview.downloadsNeeded",
@@ -572,6 +741,39 @@ function CacheMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function effectiveDesiredText(
+  policy: Policy | undefined,
+  cachedCount: string,
+  warmCount: string,
+  t: TFunction
+) {
+  const cached = policy?.effectiveCachedCount ?? Number(cachedCount || 0)
+  const warm = policy?.effectiveWarmCount ?? Number(warmCount || 0)
+  return t(
+    "placement.preview.effectiveDesired.value",
+    { downloaded: cached, ready: warm },
+    `downloaded=${cached} ready=${warm}`
+  )
+}
+
+function demandSignalText(policy: Policy | undefined, t: TFunction) {
+  if (!policy?.autoBalance) {
+    return t(
+      "placement.preview.demandSignal.manual",
+      undefined,
+      "manual capacity"
+    )
+  }
+  const queued = policy.demandQueued ?? 0
+  const running = policy.demandRunning ?? 0
+  const recent = policy.demandRecent ?? 0
+  return t(
+    "placement.preview.demandSignal.value",
+    { queued, running, recent },
+    `queued=${queued} running=${running} recent10m=${recent}`
+  )
+}
+
 function confirmPolicy(
   actions: Actions,
   t: TFunction,
@@ -581,7 +783,14 @@ function confirmPolicy(
   tags: string,
   preferred: string,
   denied: string,
-  pins: string
+  pins: string,
+  autoBalance: boolean,
+  minCachedCount: string,
+  maxCachedCount: string,
+  minWarmCount: string,
+  maxWarmCount: string,
+  maxCachedProfilesPerNode: string,
+  maxWarmProfilesPerNode: string
 ) {
   actions.setConfirm({
     title: t(
@@ -611,7 +820,14 @@ function confirmPolicy(
         tags,
         preferred,
         denied,
-        pins
+        pins,
+        autoBalance,
+        minCachedCount,
+        maxCachedCount,
+        minWarmCount,
+        maxWarmCount,
+        maxCachedProfilesPerNode,
+        maxWarmProfilesPerNode
       ),
   })
 }
@@ -641,4 +857,8 @@ function confirmPlanner(actions: Actions, t: TFunction) {
       )
     },
   })
+}
+
+function countField(value?: number) {
+  return value ? String(value) : ""
 }

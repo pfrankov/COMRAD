@@ -263,7 +263,7 @@ func (s *workerSession) failRunningAttempts() []AttemptFailedPayload {
 	var failed []AttemptFailedPayload
 	_ = s.manager.store.Update(func(db *Database) error {
 		node := db.Nodes[s.nodeID]
-		if node.ConnectedSession == s.id {
+		if node.ConnectedSession == s.id || node.ConnectedSession == "" {
 			markDisconnectedNode(db, node)
 		}
 		now := time.Now().UTC()
@@ -361,6 +361,9 @@ func (s *workerSession) writeLoop() {
 func (s *workerSession) readLoop() {
 	defer s.close()
 	for {
+		if s.manager.cfg.WorkerHeartbeatTimeout > 0 {
+			_ = s.conn.SetReadDeadline(time.Now().Add(s.manager.cfg.WorkerHeartbeatTimeout + 5*time.Second))
+		}
 		var msg Envelope
 		if err := s.conn.ReadJSON(&msg); err != nil {
 			return

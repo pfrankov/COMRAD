@@ -290,18 +290,28 @@ func (m *Manager) handleAdminPolicies(w http.ResponseWriter, r *http.Request) {
 			req.ID = "pol_" + strings.NewReplacer("/", "_", ":", "_").Replace(req.ProfileID)
 		}
 		policy := PlacementPolicy{
-			ID:              req.ID,
-			ProfileID:       req.ProfileID,
-			CachedCount:     req.CachedCount,
-			WarmCount:       req.WarmCount,
-			Constraints:     req.Constraints,
-			HardPinnedSlots: req.HardPinnedSlots,
-			CreatedAt:       now,
-			UpdatedAt:       now,
+			ID:                       req.ID,
+			ProfileID:                req.ProfileID,
+			CachedCount:              req.CachedCount,
+			WarmCount:                req.WarmCount,
+			AutoBalance:              req.AutoBalance,
+			MinCachedCount:           req.MinCachedCount,
+			MaxCachedCount:           req.MaxCachedCount,
+			MinWarmCount:             req.MinWarmCount,
+			MaxWarmCount:             req.MaxWarmCount,
+			MaxCachedProfilesPerNode: req.MaxCachedProfilesPerNode,
+			MaxWarmProfilesPerNode:   req.MaxWarmProfilesPerNode,
+			Constraints:              req.Constraints,
+			HardPinnedSlots:          req.HardPinnedSlots,
+			CreatedAt:                now,
+			UpdatedAt:                now,
 		}
 		err := m.store.Update(func(db *Database) error {
 			if _, ok := db.Profiles[policy.ProfileID]; !ok {
 				return fmt.Errorf("profile %s not found", policy.ProfileID)
+			}
+			if err := validatePlacementPolicy(policy); err != nil {
+				return err
 			}
 			if old, ok := db.Policies[policy.ID]; ok {
 				policy.CreatedAt = old.CreatedAt

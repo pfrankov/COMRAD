@@ -115,7 +115,7 @@ func policyCachedCondition(policy PlacementPolicy, plan CachePlan, at time.Time)
 
 func policyWarmCondition(policy PlacementPolicy, plan CachePlan, at time.Time) Condition {
 	actual := actualWarmCopies(plan)
-	if actual >= policy.WarmCount {
+	if actual >= desiredWarmCount(policy) {
 		return newCondition("Warm", "True", "DesiredWarmCopiesReady", "Desired warm copies are ready.", at)
 	}
 	return newCondition("Warm", "False", "DesiredWarmCopiesUnavailable", "Desired warm copies are not ready yet.", at)

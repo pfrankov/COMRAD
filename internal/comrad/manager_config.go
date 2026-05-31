@@ -38,9 +38,10 @@ type AuthConfigYAML struct {
 }
 
 type SchedulerConfigYAML struct {
-	QueueLimit        int                  `yaml:"queueLimit"`
-	StreamWaitSeconds int64                `yaml:"streamWaitSeconds"`
-	Quarantine        QuarantineConfigYAML `yaml:"quarantine"`
+	QueueLimit             int                  `yaml:"queueLimit"`
+	StreamWaitSeconds      int64                `yaml:"streamWaitSeconds"`
+	WorkerHeartbeatSeconds int64                `yaml:"workerHeartbeatSeconds"`
+	Quarantine             QuarantineConfigYAML `yaml:"quarantine"`
 }
 
 type QuarantineConfigYAML struct {
@@ -96,8 +97,9 @@ func (m *Manager) runtimeConfigYAML() RuntimeConfigYAML {
 			AllowDevDefaults:      cfg.AllowDevTokens,
 		},
 		Scheduler: SchedulerConfigYAML{
-			QueueLimit:        cfg.QueueLimit,
-			StreamWaitSeconds: int64(cfg.StreamWait.Seconds()),
+			QueueLimit:             cfg.QueueLimit,
+			StreamWaitSeconds:      int64(cfg.StreamWait.Seconds()),
+			WorkerHeartbeatSeconds: int64(cfg.WorkerHeartbeatTimeout.Seconds()),
 			Quarantine: QuarantineConfigYAML{
 				Threshold: cfg.QuarantineThreshold,
 				Seconds:   int64(cfg.QuarantineDuration.Seconds()),

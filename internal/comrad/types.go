@@ -206,15 +206,27 @@ type PlacementConstraints struct {
 }
 
 type PlacementPolicy struct {
-	ID              string               `json:"policyId"`
-	ProfileID       string               `json:"profileId"`
-	CachedCount     int                  `json:"cachedCount"`
-	WarmCount       int                  `json:"warmCount"`
-	Constraints     PlacementConstraints `json:"constraints"`
-	HardPinnedSlots []string             `json:"hardPinnedSlots,omitempty"`
-	CreatedAt       time.Time            `json:"createdAt"`
-	UpdatedAt       time.Time            `json:"updatedAt"`
-	Conditions      []Condition          `json:"conditions,omitempty"`
+	ID                       string               `json:"policyId"`
+	ProfileID                string               `json:"profileId"`
+	CachedCount              int                  `json:"cachedCount"`
+	WarmCount                int                  `json:"warmCount"`
+	AutoBalance              bool                 `json:"autoBalance,omitempty"`
+	MinCachedCount           int                  `json:"minCachedCount,omitempty"`
+	MaxCachedCount           int                  `json:"maxCachedCount,omitempty"`
+	MinWarmCount             int                  `json:"minWarmCount,omitempty"`
+	MaxWarmCount             int                  `json:"maxWarmCount,omitempty"`
+	MaxCachedProfilesPerNode int                  `json:"maxCachedProfilesPerNode,omitempty"`
+	MaxWarmProfilesPerNode   int                  `json:"maxWarmProfilesPerNode,omitempty"`
+	EffectiveCachedCount     int                  `json:"effectiveCachedCount,omitempty"`
+	EffectiveWarmCount       int                  `json:"effectiveWarmCount,omitempty"`
+	DemandQueued             int                  `json:"demandQueued,omitempty"`
+	DemandRunning            int                  `json:"demandRunning,omitempty"`
+	DemandRecent             int                  `json:"demandRecent,omitempty"`
+	Constraints              PlacementConstraints `json:"constraints"`
+	HardPinnedSlots          []string             `json:"hardPinnedSlots,omitempty"`
+	CreatedAt                time.Time            `json:"createdAt"`
+	UpdatedAt                time.Time            `json:"updatedAt"`
+	Conditions               []Condition          `json:"conditions,omitempty"`
 }
 
 type PlacementAssignment struct {

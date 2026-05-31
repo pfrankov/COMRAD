@@ -43,6 +43,13 @@ export type ModelEditorForm = {
   modelArtifactIds?: string[]
   cachedCount: string
   warmCount: string
+  autoBalance: boolean
+  minCachedCount: string
+  maxCachedCount: string
+  minWarmCount: string
+  maxWarmCount: string
+  maxCachedProfilesPerNode: string
+  maxWarmProfilesPerNode: string
 }
 
 export function splitList(value: string) {
@@ -60,7 +67,14 @@ export async function savePolicy(
   tags: string,
   preferred: string,
   denied: string,
-  pins: string
+  pins: string,
+  autoBalance = false,
+  minCachedCount = "",
+  maxCachedCount = "",
+  minWarmCount = "",
+  maxWarmCount = "",
+  maxCachedProfilesPerNode = "",
+  maxWarmProfilesPerNode = ""
 ) {
   await actions.api("/api/admin/policies", {
     method: "POST",
@@ -69,6 +83,13 @@ export async function savePolicy(
       profileId,
       cachedCount: Number(cachedCount || 0),
       warmCount: Number(warmCount || 0),
+      autoBalance,
+      minCachedCount: Number(minCachedCount || 0),
+      maxCachedCount: Number(maxCachedCount || 0),
+      minWarmCount: Number(minWarmCount || 0),
+      maxWarmCount: Number(maxWarmCount || 0),
+      maxCachedProfilesPerNode: Number(maxCachedProfilesPerNode || 0),
+      maxWarmProfilesPerNode: Number(maxWarmProfilesPerNode || 0),
       constraints: {
         requireTags: splitList(tags),
         preferNodes: splitList(preferred),
@@ -93,7 +114,18 @@ export async function registerModel(
     llamaArgs: string
   }
 ) {
-  await saveModel(actions, { ...form, cachedCount: "1", warmCount: "1" })
+  await saveModel(actions, {
+    ...form,
+    cachedCount: "1",
+    warmCount: "1",
+    autoBalance: false,
+    minCachedCount: "",
+    maxCachedCount: "",
+    minWarmCount: "",
+    maxWarmCount: "",
+    maxCachedProfilesPerNode: "",
+    maxWarmProfilesPerNode: "",
+  })
 }
 
 export async function saveModel(
@@ -155,6 +187,13 @@ warmable: true
       profileId,
       cachedCount: Number(form.cachedCount || 0),
       warmCount: Number(form.warmCount || 0),
+      autoBalance: form.autoBalance,
+      minCachedCount: Number(form.minCachedCount || 0),
+      maxCachedCount: Number(form.maxCachedCount || 0),
+      minWarmCount: Number(form.minWarmCount || 0),
+      maxWarmCount: Number(form.maxWarmCount || 0),
+      maxCachedProfilesPerNode: Number(form.maxCachedProfilesPerNode || 0),
+      maxWarmProfilesPerNode: Number(form.maxWarmProfilesPerNode || 0),
     }),
   })
   toast.success(

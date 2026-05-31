@@ -130,6 +130,25 @@ cachedCount: 1
 warmCount: 1
 ```
 
+Manual policies keep exactly those downloaded and ready counts, subject to
+compatible Worker capacity. Auto-balance is opt-in per model:
+
+```yaml
+profileId: llm.chat/local/context-4096
+autoBalance: true
+minCachedCount: 1
+maxCachedCount: 4
+minWarmCount: 1
+maxWarmCount: 3
+maxCachedProfilesPerNode: 0
+maxWarmProfilesPerNode: 0
+```
+
+`0` for the per-node limits means "limited only by Worker memory, disk, and
+slots." In auto mode, the Manager derives effective desired ready copies from
+queued, running, and recent requests, then keeps downloaded copies at least as
+high as ready copies.
+
 Apply capacity intent:
 
 ```sh
@@ -141,6 +160,6 @@ curl -sS -H "Authorization: Bearer <admin-token>" \
 
 Profiles without requirements are unschedulable.
 
-Setting both `cachedCount` and `warmCount` to `0` stops keeping that profile hot. If the artifact is not desired by another profile or update on a Worker, the Manager queues Worker cache eviction so old model files do not accumulate.
+Setting both `cachedCount` and `warmCount` to `0` stops keeping that profile hot for manual policies. For auto policies, set the min and max fields to `0` as well. If the artifact is not desired by another profile or update on a Worker, the Manager queues Worker cache eviction so old model files do not accumulate.
 
 Profiles and capacity policies also expose bounded `conditions` in Admin state. Profiles report `Ready`, `Schedulable`, and `ArtifactsAvailable`. Capacity policies report `Cached`, `Warm`, and `PlacementSatisfied`. These fields are derived from Manager state and are not editable configuration.

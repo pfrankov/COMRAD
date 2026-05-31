@@ -14,6 +14,7 @@ var (
 
 func (m *Manager) selectReadySlot(profile WorkloadProfile, taskID string) (Slot, WorkloadProfile, *workerSession, bool) {
 	m.clearExpiredQuarantines()
+	m.expireWorkerHeartbeats(time.Now().UTC())
 	db := m.store.Snapshot()
 	candidates := readySlotCandidates(db, profile, failedSlotsForTask(db, taskID))
 	sortReadySlotCandidates(candidates)
@@ -213,7 +214,7 @@ func (m *Manager) replanAndDispatch() {
 		if sess == nil {
 			continue
 		}
-		payload := AssignmentPayload{Profile: profile, Artifacts: m.artifactSpecs(profile, sess.baseURL), Cached: a.DesiredCached, Warm: a.DesiredWarm}
+		payload := AssignmentPayload{Profile: profile, Artifacts: m.artifactSpecs(profile, sess.baseURL), SlotID: a.SlotID, Cached: a.DesiredCached, Warm: a.DesiredWarm}
 		sess.enqueue(Envelope{ID: NewID("msg"), Type: MsgAssignProfile, NodeID: a.NodeID, Payload: MarshalPayload(payload)})
 	}
 	m.dispatchStaleArtifactEvictions("not_desired")

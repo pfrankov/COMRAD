@@ -109,10 +109,14 @@ Adjust capacity:
 
 1. Open **Capacity**.
 2. Select the model.
-3. Set downloaded copies and ready copies.
-4. Open advanced routing only when tags, preferred nodes, denied nodes, or hard-pinned slots are needed.
-5. Review the preview, current capacity state, and cache plan.
+3. Set downloaded copies and ready copies, or enable **Auto balance** and set min/max limits.
+4. Open advanced routing only when tags, preferred nodes, denied nodes, hard-pinned slots, or per-Worker model limits are needed.
+5. Review the effective desired counts, demand signal, current capacity state, and cache plan.
 6. Apply now or run the planner, then confirm the mutation.
+
+**Nodes** shows remaining planned memory and disk for each Worker. Offline
+Workers show the last-seen time, and offline Workers are excluded from placement
+until they reconnect and report fresh state.
 
 Handle quarantine:
 

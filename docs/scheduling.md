@@ -15,7 +15,20 @@ The dashboard shows queue depth on **Overview** and task lifecycle on **Tasks**.
 
 ## Capacity / Placement
 
-The dashboard calls this **Capacity** because operators usually decide how many model copies should be downloaded and ready. The API and internal data model still call it placement policy. The policy controls desired cached and warm counts, tags, preferred nodes, denied nodes, and hard-pinned slots. The Manager builds profile-by-slot fit results and assigns profiles only to compatible slots.
+The dashboard calls this **Capacity** because operators usually decide how many model copies should be downloaded and ready. The API and internal data model still call it placement policy. The policy controls desired cached and warm counts, optional auto-balance limits, tags, preferred nodes, denied nodes, and hard-pinned slots. The Manager builds profile-by-slot fit results and assigns profiles only to compatible slots.
+
+Manual policies use `cachedCount` and `warmCount` directly. Auto-balanced
+policies derive effective desired counts from the last 10 minutes of demand:
+queued requests, running requests, and recent requests. The derived count is
+clamped by `minWarmCount` / `maxWarmCount`, and cached copies are kept at least
+as high as warm copies while respecting cached min/max limits.
+
+Placement is global across policies. The planner satisfies minimum capacity
+first, gives scarce and larger profiles priority, and accounts for aggregate
+Worker RAM and disk budgets so smaller models do not fill machines needed by
+larger models. Cached-only copies are node-level downloads and do not reserve a
+warm execution slot. Warm copies still require a compatible slot and one local
+runtime process.
 
 When capacity drops to zero, or a profile is deleted, the Manager also removes no-longer-desired Worker cache entries. Eviction is guarded: active or still-assigned artifacts remain in place, while stale warm slots are stopped and cleared before the Worker deletes the local cached file.
 
@@ -35,7 +48,7 @@ curl -fsS -X POST -H "Authorization: Bearer <admin-token>" \
 
 ## Retry
 
-If a Worker disappears before first output, the attempt fails and the task can return to the queue. The Manager retries only on another compatible slot and records failed slots to avoid repeating the same failed candidate.
+If a Worker disappears before first output, the attempt fails and the task can return to the queue. The Manager retries only on another compatible slot and records failed slots to avoid repeating the same failed candidate. Workers send heartbeats; if a connection becomes half-open and heartbeats stop, the Manager marks the Worker offline, marks its idle slots unavailable, and replans capacity.
 
 If failure happens after first output, the stream fails and is not retried.
 

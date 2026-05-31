@@ -44,7 +44,7 @@ The Compose Manager uses `COMRAD_STORAGE_MODE=auto`. It stores state in PostgreS
 
 Compose mounts `./imports` read-only at `/var/lib/comrad/imports` inside the Manager container for Admin API path imports. Browser uploads through **Models** are stored in `COMRAD_ARTIFACT_DIR`.
 
-`COMRAD_EXTERNAL_URL` should be the URL Workers and operators use from outside the container host. It is used for authenticated artifact URLs and generated Worker join commands. `COMRAD_CLIENT_API_KEY` is bootstrapped into a default API client for initial verification. Set `COMRAD_ENFORCE_BALANCE=true` when positive-cost profiles should require enough client balance.
+`COMRAD_EXTERNAL_URL` should be the URL Workers and operators use from outside the container host. It is used for authenticated artifact URLs and generated Worker join commands. `COMRAD_CLIENT_API_KEY` is bootstrapped into a default API client for initial verification. Set `COMRAD_ENFORCE_BALANCE=true` when positive-cost profiles should require enough client balance. `COMRAD_WORKER_HEARTBEAT_TIMEOUT_SECONDS` controls when a silent Worker connection is marked offline; the default is `30`.
 
 Start a local Manager from the bundle:
 

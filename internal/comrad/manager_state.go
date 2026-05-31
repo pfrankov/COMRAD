@@ -16,6 +16,7 @@ import (
 func (m *Manager) stateResponse() StateResponse {
 	m.clearExpiredQuarantines()
 	db := m.store.Snapshot()
+	decoratePolicyEffectiveCapacity(&db, time.Now().UTC())
 	fitMatrix := BuildFitMatrix(db)
 	cachePlans := BuildCachePlans(db)
 	sortCachePlans(cachePlans)

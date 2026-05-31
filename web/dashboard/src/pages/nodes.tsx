@@ -36,7 +36,14 @@ import {
   unbanSlot,
   type Actions,
 } from "@/comrad/actions"
-import type { ArtifactEvictionRecord, Node, Slot, StateResponse } from "@/types"
+import type {
+  ArtifactEvictionRecord,
+  Assignment,
+  Node,
+  Profile,
+  Slot,
+  StateResponse,
+} from "@/types"
 
 export function NodesPage({
   state,
@@ -76,6 +83,7 @@ export function NodesPage({
                 (slot) => slot.nodeId === node.nodeId
               )}
               actions={actions}
+              resources={plannedNodeResources(node, state)}
               openDetails={() => setDetailNodeId(node.nodeId)}
               t={t}
             />
@@ -100,12 +108,14 @@ function NodeCard({
   node,
   slots,
   actions,
+  resources,
   openDetails,
   t,
 }: {
   node: Node
   slots: Slot[]
   actions: Actions
+  resources: NodeResourcePlan
   openDetails: () => void
   t: TFunction
 }) {
@@ -153,15 +163,21 @@ function NodeCard({
           />
           <ResourceStat
             icon={MemoryStickIcon}
-            label={t("nodes.metric.memory", undefined, "Memory")}
-            value={fmtBytes(
-              node.budgets?.unifiedMemoryBytes || node.budgets?.ramBytes
+            label={t(
+              "nodes.metric.memoryRemaining",
+              undefined,
+              "Memory remaining"
             )}
+            value={fmtBytes(resources.memoryRemaining)}
           />
           <ResourceStat
             icon={HardDriveIcon}
-            label={t("nodes.metric.disk", undefined, "Disk")}
-            value={fmtBytes(node.budgets?.diskBytes)}
+            label={t(
+              "nodes.metric.diskRemaining",
+              undefined,
+              "Disk remaining"
+            )}
+            value={fmtBytes(resources.diskRemaining)}
           />
         </div>
         <Separator />
@@ -249,6 +265,10 @@ function NodeTechnicalDetailsDialog({
             [
               t("nodes.field.readyModels", undefined, "Ready models"),
               node.warmProfiles?.map(short).join(", ") || "-",
+            ],
+            [
+              t("nodes.field.lastSeen", undefined, "Last seen"),
+              timeAgo(node.lastSeen, t),
             ],
             [
               t("nodes.field.lastFailure", undefined, "Last failure"),
@@ -446,6 +466,65 @@ function timeSortValue(value?: string) {
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
+type NodeResourcePlan = {
+  memoryRemaining?: number
+  diskRemaining?: number
+}
+
+function plannedNodeResources(node: Node, state: StateResponse): NodeResourcePlan {
+  const profiles = state.profiles ?? []
+  const assignments = (state.assignments ?? []).filter(
+    (assignment) => assignment.nodeId === node.nodeId
+  )
+  const memoryUsed = assignments
+    .filter((assignment) => assignment.desiredWarm)
+    .reduce(
+      (total, assignment) => total + profileMemory(profileFor(assignment, profiles)),
+      0
+    )
+  const cachedProfiles = new Set(
+    assignments
+      .filter((assignment) => assignment.desiredCached)
+      .map((assignment) => assignment.profileId)
+  )
+  const diskUsed = [...cachedProfiles].reduce(
+    (total, profileId) => total + profileDisk(profileForId(profileId, profiles)),
+    0
+  )
+  return {
+    memoryRemaining: remainingBytes(
+      node.budgets?.unifiedMemoryBytes || node.budgets?.ramBytes,
+      memoryUsed
+    ),
+    diskRemaining: remainingBytes(node.budgets?.diskBytes, diskUsed),
+  }
+}
+
+function profileFor(assignment: Assignment, profiles: Profile[]) {
+  return profileForId(assignment.profileId, profiles)
+}
+
+function profileForId(profileId: string, profiles: Profile[]) {
+  return profiles.find((profile) => profile.profileId === profileId)
+}
+
+function profileMemory(profile?: Profile) {
+  return (
+    profile?.requirements?.unifiedMemoryBytes ||
+    profile?.requirements?.ramBytes ||
+    0
+  )
+}
+
+function profileDisk(profile?: Profile) {
+  return profile?.requirements?.diskBytes || 0
+}
+
+function remainingBytes(total?: number, used = 0) {
+  if (!total) return undefined
+  return Math.max(0, total - used)
+}
+
 function ResourceStat({
   icon: Icon,
   label,
@@ -530,6 +609,12 @@ function SlotList({
 }
 
 function reasonForNode(node: Node, slots: Slot[], t: TFunction) {
+  if (node.state === "offline")
+    return t(
+      "nodes.reason.offline",
+      { lastSeen: timeAgo(node.lastSeen, t) },
+      `Worker is offline. Last seen ${timeAgo(node.lastSeen, t)}.`
+    )
   if (!node.approved)
     return t(
       "nodes.reason.notApproved",

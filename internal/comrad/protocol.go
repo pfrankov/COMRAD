@@ -66,6 +66,7 @@ type ArtifactSpec struct {
 type AssignmentPayload struct {
 	Profile   WorkloadProfile `json:"profile"`
 	Artifacts []ArtifactSpec  `json:"artifacts"`
+	SlotID    string          `json:"slotId,omitempty"`
 	Cached    bool            `json:"cached"`
 	Warm      bool            `json:"warm"`
 }

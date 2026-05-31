@@ -149,12 +149,19 @@ type WorkerJoinResponse struct {
 }
 
 type UpsertPolicyRequest struct {
-	ID              string               `json:"policyId" yaml:"policyId"`
-	ProfileID       string               `json:"profileId" yaml:"profileId"`
-	CachedCount     int                  `json:"cachedCount" yaml:"cachedCount"`
-	WarmCount       int                  `json:"warmCount" yaml:"warmCount"`
-	Constraints     PlacementConstraints `json:"constraints" yaml:"constraints"`
-	HardPinnedSlots []string             `json:"hardPinnedSlots" yaml:"hardPinnedSlots"`
+	ID                       string               `json:"policyId" yaml:"policyId"`
+	ProfileID                string               `json:"profileId" yaml:"profileId"`
+	CachedCount              int                  `json:"cachedCount" yaml:"cachedCount"`
+	WarmCount                int                  `json:"warmCount" yaml:"warmCount"`
+	AutoBalance              bool                 `json:"autoBalance" yaml:"autoBalance"`
+	MinCachedCount           int                  `json:"minCachedCount" yaml:"minCachedCount"`
+	MaxCachedCount           int                  `json:"maxCachedCount" yaml:"maxCachedCount"`
+	MinWarmCount             int                  `json:"minWarmCount" yaml:"minWarmCount"`
+	MaxWarmCount             int                  `json:"maxWarmCount" yaml:"maxWarmCount"`
+	MaxCachedProfilesPerNode int                  `json:"maxCachedProfilesPerNode" yaml:"maxCachedProfilesPerNode"`
+	MaxWarmProfilesPerNode   int                  `json:"maxWarmProfilesPerNode" yaml:"maxWarmProfilesPerNode"`
+	Constraints              PlacementConstraints `json:"constraints" yaml:"constraints"`
+	HardPinnedSlots          []string             `json:"hardPinnedSlots" yaml:"hardPinnedSlots"`
 }
 
 type UpdateNodeRequest struct {

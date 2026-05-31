@@ -97,8 +97,8 @@ Register a model in the dashboard:
 1. Ensure each Worker reports `llama.cpp-metal`; the installer copies bundled `llama-server` or an explicitly overridden archive.
 2. Open **Models**.
 3. Upload the main GGUF plus optional support files such as mmproj, or use Manager-local paths from `/var/lib/comrad/imports/<file>`. Browser uploads show percent and speed while the Manager receives the file.
-4. Click **Add a model**, including explicit compute cost and ready/downloaded copy counts, then click **Add model**.
-5. Use **Edit model** later to change client model name, llama.cpp server args, budgets, cost, ready/downloaded copies, or replacement artifact paths.
+4. Click **Add a model**, including explicit compute cost and ready/downloaded copy counts or auto-balance min/max limits, then click **Add model**.
+5. Use **Edit model** later to change client model name, llama.cpp server args, budgets, cost, ready/downloaded copies, auto-balance settings, or replacement artifact paths.
 6. Use **Delete model** to remove a profile and let Workers evict no-longer-desired cached files.
 7. Use **Models**, **Capacity**, and **Nodes** to confirm the profile becomes warm and the slot becomes ready, or that stale cache is removed. Nodes technical details show cache cleanup records as queued, blocked, evicted, or failed.
 
@@ -226,7 +226,7 @@ warmable: true
 
 Do not put model sha, tokenizer, config hash, or quantization in profile config; model identity comes from `modelArtifacts`. `llama-server` belongs to Worker installation, not model registration.
 
-Deleting a profile removes its capacity policy and assignments, then queues eviction for Worker cache files that are no longer desired or active. Setting `cachedCount` and `warmCount` to `0` stops keeping that model hot and also queues stale cache eviction. Manual node artifact eviction is for one selected Worker and is blocked when the Worker is offline or the artifact is assigned or active there. Cache cleanup records are exposed in `/api/admin/state` as `artifactEvictions`.
+Deleting a profile removes its capacity policy and assignments, then queues eviction for Worker cache files that are no longer desired or active. Setting `cachedCount` and `warmCount` to `0` stops keeping a manual policy hot; for auto-balance policies also set min/max counts to `0`. Manual node artifact eviction is for one selected Worker and is blocked when the Worker is offline or the artifact is assigned or active there. Cache cleanup records are exposed in `/api/admin/state` as `artifactEvictions`.
 
 API clients, keys, and compute:
 
@@ -253,6 +253,19 @@ Capacity / placement API:
 ```sh
 curl -fsS -H "Authorization: Bearer $ADMIN_TOKEN" "$BASE_URL/api/admin/placement"
 curl -fsS -X POST -H "Authorization: Bearer $ADMIN_TOKEN" "$BASE_URL/api/admin/placement/apply"
+```
+
+Auto-balance policy fields are optional and per model:
+
+```yaml
+profileId: llm.chat/local/context-4096
+autoBalance: true
+minCachedCount: 1
+maxCachedCount: 4
+minWarmCount: 1
+maxWarmCount: 3
+maxCachedProfilesPerNode: 0
+maxWarmProfilesPerNode: 0
 ```
 
 Tasks, attempts, and reports:

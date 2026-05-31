@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { Toggle } from "@/components/ui/toggle"
 import { DataTable } from "@/components/comrad/data-table"
 import {
   ConditionList,
@@ -64,7 +65,7 @@ import {
   type ModelEditorForm,
   type UploadProgress,
 } from "@/comrad/actions"
-import type { Artifact, Assignment, Profile, StateResponse } from "@/types"
+import type { Artifact, Assignment, Policy, Profile, StateResponse } from "@/types"
 
 type EditorMode = "add" | "edit"
 
@@ -552,7 +553,10 @@ function ModelEditorDialog(props: {
     null
   )
   const editing = props.mode === "edit"
-  const update = (key: keyof ModelEditorForm, value: string) =>
+  const update = <K extends keyof ModelEditorForm>(
+    key: K,
+    value: ModelEditorForm[K]
+  ) =>
     props.setForm({ ...props.form, [key]: value })
   useEffect(() => {
     if (props.open) {
@@ -713,7 +717,7 @@ function ModelEditorDialog(props: {
             {uploadProgress ? (
               <UploadProgressPanel progress={uploadProgress} t={props.t} />
             ) : null}
-            <FieldGroup className="grid gap-4 md:grid-cols-3">
+            <FieldGroup className="grid gap-4 md:grid-cols-4">
               <Field>
                 <FieldLabel>
                   {props.t(
@@ -728,7 +732,25 @@ function ModelEditorDialog(props: {
                   onChange={(event) =>
                     update("computeCost", event.target.value)
                   }
-                />
+                  />
+                </Field>
+              <Field>
+                <FieldLabel>
+                  {props.t(
+                    "profiles.field.autoBalance",
+                    undefined,
+                    "Auto balance"
+                  )}
+                </FieldLabel>
+                <Toggle
+                  variant="outline"
+                  pressed={props.form.autoBalance}
+                  onPressedChange={(value) => update("autoBalance", value)}
+                >
+                  {props.form.autoBalance
+                    ? props.t("common.on", undefined, "On")
+                    : props.t("common.off", undefined, "Off")}
+                </Toggle>
               </Field>
               <Field>
                 <FieldLabel>
@@ -761,6 +783,74 @@ function ModelEditorDialog(props: {
                 />
               </Field>
             </FieldGroup>
+            {props.form.autoBalance ? (
+              <FieldGroup className="grid gap-4 md:grid-cols-4">
+                <Field>
+                  <FieldLabel>
+                    {props.t(
+                      "profiles.field.minReady",
+                      undefined,
+                      "Min ready"
+                    )}
+                  </FieldLabel>
+                  <Input
+                    type="number"
+                    value={props.form.minWarmCount}
+                    onChange={(event) =>
+                      update("minWarmCount", event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>
+                    {props.t(
+                      "profiles.field.maxReady",
+                      undefined,
+                      "Max ready"
+                    )}
+                  </FieldLabel>
+                  <Input
+                    type="number"
+                    value={props.form.maxWarmCount}
+                    onChange={(event) =>
+                      update("maxWarmCount", event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>
+                    {props.t(
+                      "profiles.field.minDownloaded",
+                      undefined,
+                      "Min downloaded"
+                    )}
+                  </FieldLabel>
+                  <Input
+                    type="number"
+                    value={props.form.minCachedCount}
+                    onChange={(event) =>
+                      update("minCachedCount", event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>
+                    {props.t(
+                      "profiles.field.maxDownloaded",
+                      undefined,
+                      "Max downloaded"
+                    )}
+                  </FieldLabel>
+                  <Input
+                    type="number"
+                    value={props.form.maxCachedCount}
+                    onChange={(event) =>
+                      update("maxCachedCount", event.target.value)
+                    }
+                  />
+                </Field>
+              </FieldGroup>
+            ) : null}
             <Card className="border-dashed">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
@@ -818,6 +908,38 @@ function ModelEditorDialog(props: {
                       update("llamaArgs", event.target.value)
                     }
                     placeholder="-ngl 99 --threads 6"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>
+                    {props.t(
+                      "profiles.field.maxWarmPerWorker",
+                      undefined,
+                      "Max warm models per worker"
+                    )}
+                  </FieldLabel>
+                  <Input
+                    type="number"
+                    value={props.form.maxWarmProfilesPerNode}
+                    onChange={(event) =>
+                      update("maxWarmProfilesPerNode", event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>
+                    {props.t(
+                      "profiles.field.maxCachedPerWorker",
+                      undefined,
+                      "Max downloaded models per worker"
+                    )}
+                  </FieldLabel>
+                  <Input
+                    type="number"
+                    value={props.form.maxCachedProfilesPerNode}
+                    onChange={(event) =>
+                      update("maxCachedProfilesPerNode", event.target.value)
+                    }
                   />
                 </Field>
               </CardContent>
@@ -884,6 +1006,13 @@ function emptyModelForm(): ModelEditorForm {
     llamaArgs: "-ngl 99",
     cachedCount: "1",
     warmCount: "1",
+    autoBalance: false,
+    minCachedCount: "",
+    maxCachedCount: "",
+    minWarmCount: "",
+    maxWarmCount: "",
+    maxCachedProfilesPerNode: "",
+    maxWarmProfilesPerNode: "",
   }
 }
 
@@ -892,6 +1021,7 @@ function formFromProfile(
   state: StateResponse
 ): ModelEditorForm {
   const counts = assignmentCounts(profile.profileId, state.assignments ?? [])
+  const policy = policyForProfile(profile.profileId, state.policies ?? [])
   return {
     ...emptyModelForm(),
     profileId: profile.profileId,
@@ -904,9 +1034,24 @@ function formFromProfile(
     computeCost: String(profile.computeCost ?? 0),
     llamaArgs: profile.runtime?.llamaCpp?.args?.join(" ") || "",
     modelArtifactIds: modelArtifactIds(profile, state.artifacts ?? []),
-    cachedCount: String(counts.desiredCached || 1),
-    warmCount: String(counts.desiredWarm || 1),
+    cachedCount: String(policy?.cachedCount ?? (counts.desiredCached || 1)),
+    warmCount: String(policy?.warmCount ?? (counts.desiredWarm || 1)),
+    autoBalance: Boolean(policy?.autoBalance),
+    minCachedCount: countField(policy?.minCachedCount),
+    maxCachedCount: countField(policy?.maxCachedCount),
+    minWarmCount: countField(policy?.minWarmCount),
+    maxWarmCount: countField(policy?.maxWarmCount),
+    maxCachedProfilesPerNode: countField(policy?.maxCachedProfilesPerNode),
+    maxWarmProfilesPerNode: countField(policy?.maxWarmProfilesPerNode),
   }
+}
+
+function policyForProfile(profileId: string, policies: Policy[]) {
+  return policies.find((policy) => policy.profileId === profileId)
+}
+
+function countField(value?: number) {
+  return value ? String(value) : ""
 }
 
 function modelArtifactIds(profile: Profile, artifacts: Artifact[]) {

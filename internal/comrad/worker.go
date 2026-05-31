@@ -3,7 +3,6 @@ package comrad
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -384,78 +383,4 @@ func (w *Worker) seen(id string) bool {
 		}
 	}
 	return false
-}
-
-func (w *Worker) handleAssignment(ctx context.Context, payload AssignmentPayload) error {
-	if payload.Profile.ID == "" {
-		return errors.New("assignment missing profile")
-	}
-	if w.assignmentAlreadySatisfied(payload) {
-		return nil
-	}
-	slotID, fit := w.localFit(payload.Profile)
-	if !fit.Fits {
-		w.setAnySlotState(SlotStateIdle, payload.Profile.ID, strings.Join(fit.Reasons, ","))
-		return fmt.Errorf("assignment rejected: %s", strings.Join(fit.Reasons, ","))
-	}
-	w.mu.Lock()
-	w.assigns[assignmentKey(payload.Profile)] = payload
-	w.mu.Unlock()
-	if payload.Cached {
-		w.setSlotState(slotID, SlotStateDownloading, payload.Profile.ID, "")
-		for _, artifact := range payload.Artifacts {
-			if err := w.ensureArtifact(ctx, artifact); err != nil {
-				w.setSlotState(slotID, SlotStateError, payload.Profile.ID, err.Error())
-				return err
-			}
-		}
-		w.setSlotState(slotID, SlotStateCached, payload.Profile.ID, "")
-	}
-	if payload.Warm {
-		w.setSlotState(slotID, SlotStateLoading, payload.Profile.ID, "")
-		if err := w.verifyProfileArtifacts(payload.Profile); err != nil {
-			w.setSlotState(slotID, SlotStateError, payload.Profile.ID, err.Error())
-			return err
-		}
-		w.setSlotState(slotID, SlotStateWarming, payload.Profile.ID, "")
-		if err := w.ensureRuntimeServer(ctx, slotID, payload.Profile); err != nil {
-			w.setSlotState(slotID, SlotStateError, payload.Profile.ID, err.Error())
-			return err
-		}
-		w.setSlotState(slotID, SlotStateReady, payload.Profile.ID, "")
-	}
-	w.saveState()
-	return nil
-}
-
-func (w *Worker) assignmentAlreadySatisfied(payload AssignmentPayload) bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	key := assignmentKey(payload.Profile)
-	for _, slot := range w.slots {
-		if !slotProfileCurrent(slot, payload.Profile.ID, payload.Profile) {
-			continue
-		}
-		switch slot.State {
-		case SlotStateReady, SlotStateServing:
-			proc := w.runtimes[slot.ID]
-			return proc != nil && proc.profileKey == key && proc.alive()
-		case SlotStateDownloading, SlotStateCached, SlotStateLoading, SlotStateWarming:
-			return true
-		}
-	}
-	return false
-}
-
-func (w *Worker) localFit(profile WorkloadProfile) (string, FitResult) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	for _, slot := range w.slots {
-		fit := FitProfileToSlot(profile, w.node, slot)
-		if fit.Fits {
-			return slot.ID, fit
-		}
-		return slot.ID, fit
-	}
-	return "", FitResult{ProfileID: profile.ID, Fits: false, Reasons: []string{"no_slots"}}
 }

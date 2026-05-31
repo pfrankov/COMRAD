@@ -85,7 +85,7 @@ func (w *Worker) admitTask(payload ExecuteTaskPayload) (taskAdmissionFailure, bo
 	if slot.ActiveTaskID != "" || slot.State != SlotStateReady || !slotProfileCurrent(slot, payload.Profile.ID, payload.Profile) {
 		return taskAdmissionFailure{phase: "admission", reason: FailureAdmissionCheckFailed}, true
 	}
-	_, fit := w.localFit(payload.Profile)
+	_, fit := w.localFit(payload.Profile, payload.SlotID)
 	if !fit.Fits {
 		return taskAdmissionFailure{phase: "admission", reason: strings.Join(fit.Reasons, ",")}, true
 	}

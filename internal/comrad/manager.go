@@ -15,22 +15,23 @@ import (
 )
 
 type ManagerConfig struct {
-	Addr                string
-	DBPath              string
-	DatabaseURL         string
-	StorageMode         string
-	ArtifactDir         string
-	AdminToken          string
-	ClientAPIKey        string
-	WorkerToken         string
-	EnforceBalance      bool
-	QueueLimit          int
-	StreamWait          time.Duration
-	QuarantineThreshold int
-	QuarantineDuration  time.Duration
-	AutoApprove         bool
-	ExternalURL         string
-	AllowDevTokens      bool
+	Addr                   string
+	DBPath                 string
+	DatabaseURL            string
+	StorageMode            string
+	ArtifactDir            string
+	AdminToken             string
+	ClientAPIKey           string
+	WorkerToken            string
+	EnforceBalance         bool
+	QueueLimit             int
+	StreamWait             time.Duration
+	QuarantineThreshold    int
+	QuarantineDuration     time.Duration
+	WorkerHeartbeatTimeout time.Duration
+	AutoApprove            bool
+	ExternalURL            string
+	AllowDevTokens         bool
 }
 
 type Manager struct {
@@ -127,6 +128,9 @@ func applyManagerDefaults(cfg *ManagerConfig) {
 	}
 	if cfg.QuarantineDuration <= 0 {
 		cfg.QuarantineDuration = 5 * time.Minute
+	}
+	if cfg.WorkerHeartbeatTimeout <= 0 {
+		cfg.WorkerHeartbeatTimeout = 30 * time.Second
 	}
 	if cfg.AllowDevTokens {
 		applyDevTokenDefaults(cfg)
@@ -240,6 +244,7 @@ func (m *Manager) Handler() http.Handler {
 func (m *Manager) Serve(ctx context.Context) error {
 	srv := &http.Server{Addr: m.cfg.Addr, Handler: m.Handler()}
 	errCh := make(chan error, 1)
+	go m.runWorkerHeartbeatMonitor(ctx.Done())
 	go func() {
 		log.Printf("comrad manager listening on %s", m.cfg.Addr)
 		errCh <- srv.ListenAndServe()

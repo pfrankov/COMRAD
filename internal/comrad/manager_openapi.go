@@ -283,7 +283,7 @@ func openAPISchemas() map[string]any {
 		"PlainOK":                       map[string]string{"type": "string", "example": "OK"},
 		"PlacementState":                freeObject(),
 		"PolicyList":                    arrayOf("PlacementPolicy"),
-		"PlacementPolicy":               freeObject(),
+		"PlacementPolicy":               placementPolicySchema(),
 		"ProfileList":                   arrayOf("WorkloadProfile"),
 		"PrometheusText":                map[string]string{"type": "string"},
 		"ReportList":                    arrayOf("ComputeReport"),
@@ -301,7 +301,7 @@ func openAPISchemas() map[string]any {
 		"UpdateNodeRequest":             object(map[string]any{"nodeId": stringSchema(), "ownerUserId": stringSchema(), "approved": map[string]string{"type": "boolean"}, "mode": stringSchema(), "tags": arrayOfPrimitive("string"), "state": stringSchema()}),
 		"UpdateRecord":                  freeObject(),
 		"UpdateUserRequest":             object(map[string]any{"userId": stringSchema(), "name": stringSchema(), "disabled": map[string]string{"type": "boolean"}}),
-		"UpsertPolicyRequest":           freeObject(),
+		"UpsertPolicyRequest":           placementPolicySchema(),
 		"User":                          object(map[string]any{"userId": stringSchema(), "name": stringSchema(), "computeBalance": integerSchema(), "disabled": map[string]string{"type": "boolean"}, "createdAt": dateTimeSchema()}),
 		"UserList":                      arrayOf("User"),
 		"WebSocketUpgrade":              map[string]string{"type": "string", "description": "HTTP upgrade to WebSocket"},
@@ -309,6 +309,32 @@ func openAPISchemas() map[string]any {
 		"WorkloadProfile":               freeObject(),
 		"YAMLDocument":                  map[string]string{"type": "string"},
 	}
+}
+
+func placementPolicySchema() map[string]any {
+	return object(map[string]any{
+		"policyId":                 stringSchema(),
+		"profileId":                stringSchema(),
+		"cachedCount":              integerSchema(),
+		"warmCount":                integerSchema(),
+		"autoBalance":              booleanSchema(),
+		"minCachedCount":           integerSchema(),
+		"maxCachedCount":           integerSchema(),
+		"minWarmCount":             integerSchema(),
+		"maxWarmCount":             integerSchema(),
+		"maxCachedProfilesPerNode": integerSchema(),
+		"maxWarmProfilesPerNode":   integerSchema(),
+		"effectiveCachedCount":     integerSchema(),
+		"effectiveWarmCount":       integerSchema(),
+		"demandQueued":             integerSchema(),
+		"demandRunning":            integerSchema(),
+		"demandRecent":             integerSchema(),
+		"constraints":              freeObject(),
+		"hardPinnedSlots":          arrayOfPrimitive("string"),
+		"createdAt":                dateTimeSchema(),
+		"updatedAt":                dateTimeSchema(),
+		"conditions":               map[string]any{"type": "array", "items": freeObject()},
+	})
 }
 
 func object(properties map[string]any) map[string]any {
@@ -333,6 +359,10 @@ func stringSchema() map[string]string {
 
 func integerSchema() map[string]string {
 	return map[string]string{"type": "integer", "format": "int64"}
+}
+
+func booleanSchema() map[string]string {
+	return map[string]string{"type": "boolean"}
 }
 
 func dateTimeSchema() map[string]string {
