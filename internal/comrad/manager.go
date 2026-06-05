@@ -15,23 +15,27 @@ import (
 )
 
 type ManagerConfig struct {
-	Addr                   string
-	DBPath                 string
-	DatabaseURL            string
-	StorageMode            string
-	ArtifactDir            string
-	AdminToken             string
-	ClientAPIKey           string
-	WorkerToken            string
-	EnforceBalance         bool
-	QueueLimit             int
-	StreamWait             time.Duration
-	QuarantineThreshold    int
-	QuarantineDuration     time.Duration
-	WorkerHeartbeatTimeout time.Duration
-	AutoApprove            bool
-	ExternalURL            string
-	AllowDevTokens         bool
+	Addr                         string
+	DBPath                       string
+	DatabaseURL                  string
+	StorageMode                  string
+	ArtifactDir                  string
+	AdminToken                   string
+	ClientAPIKey                 string
+	WorkerToken                  string
+	EnforceBalance               bool
+	QueueLimit                   int
+	StreamWait                   time.Duration
+	AutoBalanceScaleDownCooldown time.Duration
+	QuarantineThreshold          int
+	QuarantineDuration           time.Duration
+	WorkerHeartbeatTimeout       time.Duration
+	WorkerFlapThreshold          int
+	WorkerFlapWindow             time.Duration
+	WorkerFlapCooldown           time.Duration
+	AutoApprove                  bool
+	ExternalURL                  string
+	AllowDevTokens               bool
 }
 
 type Manager struct {
@@ -107,6 +111,15 @@ func NewManager(cfg ManagerConfig) (*Manager, error) {
 }
 
 func applyManagerDefaults(cfg *ManagerConfig) {
+	applyManagerPathDefaults(cfg)
+	applyManagerRuntimeDefaults(cfg)
+	applyWorkerHealthDefaults(cfg)
+	if cfg.AllowDevTokens {
+		applyDevTokenDefaults(cfg)
+	}
+}
+
+func applyManagerPathDefaults(cfg *ManagerConfig) {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:1922"
 	}
@@ -117,11 +130,17 @@ func applyManagerDefaults(cfg *ManagerConfig) {
 	if cfg.ArtifactDir == "" {
 		cfg.ArtifactDir = "data/artifacts"
 	}
+}
+
+func applyManagerRuntimeDefaults(cfg *ManagerConfig) {
 	if cfg.QueueLimit <= 0 {
 		cfg.QueueLimit = 32
 	}
 	if cfg.StreamWait <= 0 {
 		cfg.StreamWait = 15 * time.Second
+	}
+	if cfg.AutoBalanceScaleDownCooldown <= 0 {
+		cfg.AutoBalanceScaleDownCooldown = defaultAutoBalanceScaleDownCooldown
 	}
 	if cfg.QuarantineThreshold <= 0 {
 		cfg.QuarantineThreshold = 3
@@ -129,11 +148,20 @@ func applyManagerDefaults(cfg *ManagerConfig) {
 	if cfg.QuarantineDuration <= 0 {
 		cfg.QuarantineDuration = 5 * time.Minute
 	}
+}
+
+func applyWorkerHealthDefaults(cfg *ManagerConfig) {
 	if cfg.WorkerHeartbeatTimeout <= 0 {
 		cfg.WorkerHeartbeatTimeout = 30 * time.Second
 	}
-	if cfg.AllowDevTokens {
-		applyDevTokenDefaults(cfg)
+	if cfg.WorkerFlapThreshold <= 0 {
+		cfg.WorkerFlapThreshold = 4
+	}
+	if cfg.WorkerFlapWindow <= 0 {
+		cfg.WorkerFlapWindow = 5 * time.Minute
+	}
+	if cfg.WorkerFlapCooldown <= 0 {
+		cfg.WorkerFlapCooldown = 5 * time.Minute
 	}
 }
 
@@ -220,6 +248,7 @@ func (m *Manager) Handler() http.Handler {
 	mux.HandleFunc("/api/admin/api-keys/lookup", m.adminOnly(m.handleAdminAPIKeyLookup))
 	mux.HandleFunc("/api/admin/api-keys", m.adminOnly(m.handleAdminAPIKeys))
 	mux.HandleFunc("/api/admin/api-keys/revoke", m.adminOnly(m.handleAdminAPIKeyRevoke))
+	mux.HandleFunc("/api/admin/placement/explain", m.adminOnly(m.handleAdminPlacementExplain))
 	mux.HandleFunc("/api/admin/placement", m.adminOnly(m.handleAdminPlacement))
 	mux.HandleFunc("/api/admin/placement/apply", m.adminOnly(m.handleApplyPlacement))
 	mux.HandleFunc("/api/admin/tasks", m.adminOnly(m.handleAdminTasks))

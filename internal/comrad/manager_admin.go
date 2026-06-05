@@ -340,7 +340,7 @@ func (m *Manager) handleAdminPlacement(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"fitMatrix":   BuildFitMatrix(db),
 		"assignments": SortedAssignments(db),
-		"plan":        PlanPlacement(db),
+		"plan":        PlanPlacementWithConfig(db, m.cfg),
 	})
 }
 

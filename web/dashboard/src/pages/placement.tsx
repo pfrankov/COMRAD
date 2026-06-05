@@ -32,12 +32,26 @@ import { DataTable } from "@/components/comrad/data-table"
 import { DryRun, PageTitle } from "@/components/comrad/dashboard-primitives"
 import { StatusBadge } from "@/components/comrad/status-badge"
 import { useI18n, type TFunction } from "@/i18n/i18n-provider"
-import { assignmentCounts, human, profileLabel, short } from "@/lib/comrad"
-import { savePolicy, type Actions } from "@/comrad/actions"
+import {
+  assignmentCounts,
+  human,
+  profileLabel,
+  short,
+  timeAgo,
+} from "@/lib/comrad"
+import {
+  savePolicy,
+  setCacheArtifactAction,
+  type Actions,
+} from "@/comrad/actions"
 import type {
+  Assignment,
   CachePlan,
   CacheWorkerStatus,
   FitResult,
+  PlacementCandidateExplanation,
+  PlacementExplainResponse,
+  PlacementMissingExplanation,
   Policy,
   StateResponse,
 } from "@/types"
@@ -66,6 +80,9 @@ export function PlacementPage({
   const [maxCachedProfilesPerNode, setMaxCachedProfilesPerNode] = useState("")
   const [maxWarmProfilesPerNode, setMaxWarmProfilesPerNode] = useState("")
   const [advanced, setAdvanced] = useState(false)
+  const [explain, setExplain] = useState<PlacementExplainResponse | null>(null)
+  const [explainLoading, setExplainLoading] = useState(false)
+  const [explainError, setExplainError] = useState("")
 
   const assignments = useMemo(
     () => state.assignments ?? [],
@@ -76,7 +93,8 @@ export function PlacementPage({
     [assignments, profileId]
   )
   const selectedCachePlan = useMemo(
-    () => (state.cachePlans ?? []).find((item) => item.profileRef === profileId),
+    () =>
+      (state.cachePlans ?? []).find((item) => item.profileRef === profileId),
     [state.cachePlans, profileId]
   )
   const selectedPolicy = useMemo(
@@ -430,6 +448,26 @@ export function PlacementPage({
               >
                 {t("placement.action.runPlanner", undefined, "Run planner")}
               </Button>
+              <Button
+                variant="outline"
+                disabled={explainLoading}
+                onClick={() =>
+                  loadPlacementExplain(
+                    actions,
+                    setExplain,
+                    setExplainLoading,
+                    setExplainError
+                  )
+                }
+              >
+                {explainLoading
+                  ? t("placement.explain.loading", undefined, "Explaining")
+                  : t(
+                      "placement.action.explainPlacement",
+                      undefined,
+                      "Explain placement"
+                    )}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -453,7 +491,9 @@ export function PlacementPage({
                 undefined,
                 "Effective desired"
               )}
-              items={[effectiveDesiredText(selectedPolicy, cachedCount, warmCount, t)]}
+              items={[
+                effectiveDesiredText(selectedPolicy, cachedCount, warmCount, t),
+              ]}
             />
             <DryRun
               title={t(
@@ -580,7 +620,28 @@ export function PlacementPage({
           />
         </CardContent>
       </Card>
-      <CachePlanPanel cachePlan={selectedCachePlan} t={t} />
+      <CachePlanPanel
+        actions={actions}
+        assignments={selectedAssignments}
+        cachePlan={selectedCachePlan}
+        profileId={profileId}
+        t={t}
+      />
+      <PlacementExplainPanel
+        explain={explain}
+        error={explainError}
+        loading={explainLoading}
+        profileId={profileId}
+        refresh={() =>
+          loadPlacementExplain(
+            actions,
+            setExplain,
+            setExplainLoading,
+            setExplainError
+          )
+        }
+        t={t}
+      />
       <Card>
         <CardHeader>
           <CardTitle>
@@ -626,12 +687,19 @@ export function PlacementPage({
 }
 
 function CachePlanPanel({
+  actions,
+  assignments,
   cachePlan,
+  profileId,
   t,
 }: {
+  actions: Actions
+  assignments: Assignment[]
   cachePlan?: CachePlan
+  profileId: string
   t: TFunction
 }) {
+  const desiredNodes = desiredCachedNodes(assignments, profileId)
   return (
     <Card>
       <CardHeader>
@@ -702,15 +770,37 @@ function CachePlanPanel({
                   cell: (item) => <StatusBadge value={String(!!item.active)} />,
                 },
                 {
-                  header: t("placement.cachePlan.eviction", undefined, "Cleanup"),
+                  header: t(
+                    "placement.cachePlan.eviction",
+                    undefined,
+                    "Cleanup"
+                  ),
                   cell: (item) => (
                     <StatusBadge value={item.eviction?.status || "none"} />
+                  ),
+                },
+                {
+                  header: t("placement.cachePlan.intent", undefined, "Intent"),
+                  cell: (item) => (
+                    <StatusBadge value={item.intent?.action || "none"} />
                   ),
                 },
                 {
                   header: t("placement.column.reason", undefined, "Reason"),
                   cell: (item) =>
                     human(item.eviction?.failure || item.eviction?.reason, t),
+                },
+                {
+                  header: t("placement.cachePlan.action", undefined, "Action"),
+                  cell: (item) => (
+                    <CacheWorkerActions
+                      actions={actions}
+                      artifacts={cachePlan.artifacts ?? []}
+                      isStale={isStaleCacheWorker(item, desiredNodes)}
+                      nodeId={item.nodeId}
+                      t={t}
+                    />
+                  ),
                 },
               ]}
             />
@@ -741,6 +831,207 @@ function CacheMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function CacheWorkerActions({
+  actions,
+  artifacts,
+  isStale,
+  nodeId,
+  t,
+}: {
+  actions: Actions
+  artifacts: string[]
+  isStale: boolean
+  nodeId: string
+  t: TFunction
+}) {
+  if (!isStale) return <span>{t("common.none", undefined, "None")}</span>
+  const disabled = artifacts.length === 0
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        onClick={() =>
+          setCacheArtifactAction(nodeId, artifacts, "keep", actions)
+        }
+      >
+        {t("nodes.action.cacheKeep", undefined, "Keep")}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        onClick={() =>
+          setCacheArtifactAction(nodeId, artifacts, "evict_when_idle", actions)
+        }
+      >
+        {t("nodes.action.cacheEvictWhenIdle", undefined, "Evict when idle")}
+      </Button>
+      <Button
+        size="sm"
+        variant="destructive"
+        disabled={disabled}
+        onClick={() =>
+          setCacheArtifactAction(nodeId, artifacts, "evict", actions)
+        }
+      >
+        {t("nodes.action.evictArtifact", undefined, "Remove from worker")}
+      </Button>
+    </div>
+  )
+}
+
+function desiredCachedNodes(assignments: Assignment[], profileId: string) {
+  return new Set(
+    assignments
+      .filter(
+        (assignment) =>
+          assignment.profileId === profileId &&
+          assignment.nodeId &&
+          assignment.desiredCached
+      )
+      .map((assignment) => assignment.nodeId as string)
+  )
+}
+
+function isStaleCacheWorker(
+  worker: CacheWorkerStatus,
+  desiredNodes: Set<string>
+) {
+  return Boolean(
+    worker.cached && !worker.active && !desiredNodes.has(worker.nodeId)
+  )
+}
+
+function PlacementExplainPanel({
+  explain,
+  error,
+  loading,
+  profileId,
+  refresh,
+  t,
+}: {
+  explain: PlacementExplainResponse | null
+  error: string
+  loading: boolean
+  profileId: string
+  refresh: () => void
+  t: TFunction
+}) {
+  const profile = explain?.profiles?.find(
+    (item) => item.profileId === profileId
+  )
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <CardTitle>
+              {t("placement.explain.title", undefined, "Placement explain")}
+            </CardTitle>
+            <CardDescription>
+              {t(
+                "placement.explain.description",
+                undefined,
+                "Dry-run candidate reasons from the Manager planner."
+              )}
+            </CardDescription>
+          </div>
+          <Button variant="outline" disabled={loading} onClick={refresh}>
+            {loading
+              ? t("placement.explain.loading", undefined, "Explaining")
+              : t(
+                  "placement.action.explainPlacement",
+                  undefined,
+                  "Explain placement"
+                )}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error ? (
+          <p className="text-sm text-destructive">
+            {t(
+              "placement.explain.error",
+              { error },
+              `Explain failed: ${error}`
+            )}
+          </p>
+        ) : null}
+        {!explain ? (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "placement.explain.empty",
+              undefined,
+              "Run explain to inspect selected, rejected, and missing placement candidates."
+            )}
+          </p>
+        ) : !profile ? (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "placement.explain.noProfile",
+              undefined,
+              "No explain data for the selected model."
+            )}
+          </p>
+        ) : (
+          <>
+            <div className="text-xs text-muted-foreground">
+              {t(
+                "placement.explain.generated",
+                { time: timeAgo(explain.generatedAt, t) },
+                `Generated ${timeAgo(explain.generatedAt, t)}`
+              )}
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <DryRun
+                title={t("placement.explain.selected", undefined, "Selected")}
+                items={candidateItems(profile.selected, t)}
+              />
+              <DryRun
+                title={t("placement.explain.rejected", undefined, "Rejected")}
+                items={candidateItems(profile.rejected, t)}
+              />
+              <DryRun
+                title={t("placement.explain.missing", undefined, "Missing")}
+                items={missingItems(profile.missing, t)}
+              />
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function candidateItems(
+  candidates: PlacementCandidateExplanation[] | undefined,
+  t: TFunction
+) {
+  return (candidates ?? []).map((candidate) => {
+    const target =
+      candidate.slotId || candidate.nodeId || candidate.modelArtifactId
+    const reasons = reasonList(candidate.reasons, t)
+    return `${human(candidate.phase, t)} ${short(target)}: ${reasons}`
+  })
+}
+
+function missingItems(
+  missing: PlacementMissingExplanation[] | undefined,
+  t: TFunction
+) {
+  return (missing ?? []).map(
+    (item) => `${human(item.phase, t)}: ${reasonList(item.reasons, t)}`
+  )
+}
+
+function reasonList(reasons: string[] | undefined, t: TFunction) {
+  return reasons?.length
+    ? reasons.map((reason) => human(reason, t)).join(", ")
+    : t("common.none", undefined, "None")
+}
+
 function effectiveDesiredText(
   policy: Policy | undefined,
   cachedCount: string,
@@ -767,11 +1058,33 @@ function demandSignalText(policy: Policy | undefined, t: TFunction) {
   const queued = policy.demandQueued ?? 0
   const running = policy.demandRunning ?? 0
   const recent = policy.demandRecent ?? 0
+  const smoothed = policy.demandSmoothed ?? 0
   return t(
     "placement.preview.demandSignal.value",
-    { queued, running, recent },
-    `queued=${queued} running=${running} recent10m=${recent}`
+    { queued, running, recent, smoothed },
+    `queued=${queued} running=${running} recent10m=${recent} smoothed=${smoothed}`
   )
+}
+
+async function loadPlacementExplain(
+  actions: Actions,
+  setExplain: (value: PlacementExplainResponse | null) => void,
+  setLoading: (value: boolean) => void,
+  setError: (value: string) => void
+) {
+  setLoading(true)
+  setError("")
+  try {
+    setExplain(
+      await actions.fetchJSON<PlacementExplainResponse>(
+        "/api/admin/placement/explain"
+      )
+    )
+  } catch (error) {
+    setError(error instanceof Error ? error.message : String(error))
+  } finally {
+    setLoading(false)
+  }
 }
 
 function confirmPolicy(

@@ -202,7 +202,12 @@ func (m *Manager) upsertWorkerState(s *workerSession, node Node, slots []Slot, c
 			return err
 		}
 		issuedNodeToken = token
-		node = mergeExistingNode(node, db.Nodes[node.ID], m.cfg.AutoApprove, now)
+		existing := db.Nodes[node.ID]
+		reconnect := workerReconnectEventApplies(existing, s.id)
+		node = mergeExistingNode(node, existing, m.cfg.AutoApprove, now)
+		if reconnect {
+			node = recordWorkerFlapEvent(node, workerFlapEventReconnect, now, m.cfg)
+		}
 		db.Nodes[node.ID] = node
 		upsertWorkerSlots(db, node, slots, now)
 		db.Audit = append(db.Audit, AuditEvent{ID: NewID("aud"), Type: "worker.connected", Actor: "worker", Subject: node.ID, CreatedAt: now})
@@ -235,6 +240,7 @@ func (m *Manager) updateArtifactState(nodeID string, payload ArtifactStatePayloa
 		}
 		if payload.State == "evicted" {
 			node.CachedArtifacts = removeArtifactID(node.CachedArtifacts, payload.ArtifactID)
+			clearCacheIntentRecord(db, nodeID, payload.ArtifactID)
 		}
 		if status := evictionStatusForArtifactState(payload.State); status != "" {
 			upsertArtifactEvictionRecord(db, nodeID, payload.ArtifactID, "", status, payload.Error, now)

@@ -105,6 +105,12 @@ auth:
 scheduler:
   queueLimit: 32
   streamWaitSeconds: 15
+  autoBalanceScaleDownCooldownSeconds: 300
+  workerHeartbeatSeconds: 30
+  workerFlap:
+    threshold: 4
+    windowSeconds: 300
+    cooldownSeconds: 300
   quarantine:
     threshold: 3
     seconds: 300

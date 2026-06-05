@@ -70,6 +70,7 @@ func openAPIPaths() map[string]any {
 		"/api/admin/api-keys/lookup":                       postOperation("Admin", "Find the API client for a raw key", adminSecurity(), "APIKeyLookupRequest", "APIKeyLookupResponse"),
 		"/api/admin/api-keys/revoke":                       postOperation("Admin", "Revoke a client API key", adminSecurity(), "RevokeAPIKeyRequest", "StatusResponse"),
 		"/api/admin/placement":                             getOperation("Admin", "Preview placement state", adminSecurity(), "PlacementState"),
+		"/api/admin/placement/explain":                     getOperation("Admin", "Explain placement dry run", adminSecurity(), "PlacementExplainResponse"),
 		"/api/admin/placement/apply":                       postOperation("Admin", "Apply placement", adminSecurity(), "", "StatusResponse"),
 		"/api/admin/tasks":                                 getOperation("Admin", "List paginated tasks", adminSecurity(), "TaskListResponse"),
 		"/api/admin/attempts":                              getOperation("Admin", "List attempts", adminSecurity(), "AttemptList"),
@@ -111,7 +112,10 @@ func nodeArtifactEvictionOperation() map[string]any {
 		parameter("artifactId", "path", true),
 	}
 	del["responses"] = acceptedResponses("StatusResponse")
-	return map[string]any{"delete": del}
+	post := operation("post", "Admin", "Set a cached artifact action", adminSecurity(), "CacheArtifactActionRequest", "StatusResponse")
+	post["parameters"] = del["parameters"]
+	post["responses"] = acceptedResponses("StatusResponse")
+	return map[string]any{"delete": del, "post": post}
 }
 
 func adminUsersOperation() map[string]any {
@@ -268,6 +272,7 @@ func openAPISchemas() map[string]any {
 		"ChatCompletionChunk":           freeObject(),
 		"ChatCompletionRequest":         object(map[string]any{"model": stringSchema(), "messages": arrayOf("ChatMessage"), "stream": map[string]string{"type": "boolean"}, "max_tokens": integerSchema(), "temperature": map[string]string{"type": "number"}, "min_context_tokens": integerSchema()}),
 		"ChatMessage":                   object(map[string]any{"role": stringSchema(), "content": stringSchema()}),
+		"CacheArtifactActionRequest":    object(map[string]any{"action": stringSchema()}),
 		"ComputeLedgerEntry":            freeObject(),
 		"CreateArtifactRequest":         object(map[string]any{"kind": stringSchema(), "name": stringSchema(), "path": stringSchema(), "sha256": stringSchema()}),
 		"CreateProfileRequest":          freeObject(),
@@ -282,6 +287,11 @@ func openAPISchemas() map[string]any {
 		"OpenAPIDocument":               freeObject(),
 		"PlainOK":                       map[string]string{"type": "string", "example": "OK"},
 		"PlacementState":                freeObject(),
+		"PlacementExplainResponse":      placementExplainResponseSchema(),
+		"PlacementAssignment":           freeObject(),
+		"PlacementProfileExplanation":   placementProfileExplanationSchema(),
+		"PlacementCandidateExplanation": placementCandidateExplanationSchema(),
+		"PlacementMissingExplanation":   placementMissingExplanationSchema(),
 		"PolicyList":                    arrayOf("PlacementPolicy"),
 		"PlacementPolicy":               placementPolicySchema(),
 		"ProfileList":                   arrayOf("WorkloadProfile"),
@@ -329,6 +339,7 @@ func placementPolicySchema() map[string]any {
 		"demandQueued":             integerSchema(),
 		"demandRunning":            integerSchema(),
 		"demandRecent":             integerSchema(),
+		"demandSmoothed":           integerSchema(),
 		"constraints":              freeObject(),
 		"hardPinnedSlots":          arrayOfPrimitive("string"),
 		"createdAt":                dateTimeSchema(),

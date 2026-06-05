@@ -60,6 +60,8 @@ func TestExecuteTaskRestartsLlamaServerAfterProcessExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := currentRuntimeProcess(t, worker)
+	restore := stubRuntimeRestart()
+	defer restore()
 	drainWorkerMessages(worker.send)
 
 	worker.executeTask(runtimeServerExecutePayload(profile))
@@ -80,6 +82,8 @@ func TestRuntimeWatcherRestartsExitedReadyLlamaServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := currentRuntimeProcess(t, worker)
+	restore := stubRuntimeRestart()
+	defer restore()
 	if err := old.cmd.Process.Kill(); err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +210,7 @@ func currentRuntimeProcess(t *testing.T, worker *Worker) *llamaServerProcess {
 
 func waitForRuntimeReplacement(t *testing.T, worker *Worker, old *llamaServerProcess, state string) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(worker.cfg.RuntimeStartWait + 2*time.Second)
 	for time.Now().Before(deadline) {
 		worker.mu.Lock()
 		proc := worker.runtimes["node-a/metal0"]
@@ -222,6 +226,21 @@ func waitForRuntimeReplacement(t *testing.T, worker *Worker, old *llamaServerPro
 	slot := worker.slots["node-a/metal0"]
 	worker.mu.Unlock()
 	t.Fatalf("runtime was not replaced; proc=%p old=%p slot=%+v", proc, old, slot)
+}
+
+func stubRuntimeRestart() func() {
+	oldStart := startLlamaServerProcessFn
+	oldWait := waitForLlamaServerReadyFn
+	startLlamaServerProcessFn = func(_ string, _ []string, _ int, profileKey string) (*llamaServerProcess, error) {
+		return &llamaServerProcess{baseURL: "http://127.0.0.1:1", profileKey: profileKey, stderr: &cappedBuffer{limit: 1024}, done: make(chan struct{})}, nil
+	}
+	waitForLlamaServerReadyFn = func(context.Context, *http.Client, *llamaServerProcess, time.Duration) error {
+		return nil
+	}
+	return func() {
+		startLlamaServerProcessFn = oldStart
+		waitForLlamaServerReadyFn = oldWait
+	}
 }
 
 func assertFakeServerArgs(t *testing.T, path string, wants ...string) {

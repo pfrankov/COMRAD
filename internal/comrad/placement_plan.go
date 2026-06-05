@@ -6,16 +6,20 @@ import (
 	"time"
 )
 
-const autoBalanceDemandWindow = 10 * time.Minute
+const (
+	autoBalanceDemandWindow  = 10 * time.Minute
+	autoBalanceDemandBuckets = 5
+)
 
 type policyCapacity struct {
-	Cached        int
-	Warm          int
-	MinCached     int
-	MinWarm       int
-	DemandQueued  int
-	DemandRunning int
-	DemandRecent  int
+	Cached         int
+	Warm           int
+	MinCached      int
+	MinWarm        int
+	DemandQueued   int
+	DemandRunning  int
+	DemandRecent   int
+	DemandSmoothed int
 }
 
 type policyPlanItem struct {
@@ -30,7 +34,10 @@ type policyPlanItem struct {
 type placementPlanner struct {
 	db             Database
 	now            time.Time
+	cooldown       time.Duration
+	explain        *placementExplainer
 	assignments    []PlacementAssignment
+	protected      map[string]bool
 	warmByProfile  map[string]int
 	cacheByProfile map[string]int
 	slotUsed       map[string]bool
@@ -42,10 +49,22 @@ type placementPlanner struct {
 }
 
 func PlanPlacement(db Database) []PlacementAssignment {
-	now := time.Now().UTC()
-	planner := newPlacementPlanner(db, now)
+	return planPlacement(db, time.Now().UTC(), nil)
+}
+
+func PlanPlacementWithConfig(db Database, cfg ManagerConfig) []PlacementAssignment {
+	return planPlacementWithCooldown(db, time.Now().UTC(), nil, managerAutoBalanceCooldown(cfg))
+}
+
+func planPlacement(db Database, now time.Time, explain *placementExplainer) []PlacementAssignment {
+	return planPlacementWithCooldown(db, now, explain, defaultAutoBalanceScaleDownCooldown)
+}
+
+func planPlacementWithCooldown(db Database, now time.Time, explain *placementExplainer, cooldown time.Duration) []PlacementAssignment {
+	planner := newPlacementPlanner(db, now, explain, cooldown)
 	items := planner.policyItems()
 	planner.placeHardPins(items)
+	planner.preserveRuntimeCopies(items)
 	sortPolicyItems(items, false)
 	for _, item := range items {
 		planner.placeWarmUntil(item, item.capacity.MinWarm)
@@ -60,14 +79,21 @@ func PlanPlacement(db Database) []PlacementAssignment {
 	for _, item := range items {
 		planner.placeCacheUntil(item, item.capacity.Cached)
 	}
+	planner.markDrainingAssignments(items)
 	sortAssignments(planner.assignments)
+	if explain != nil {
+		explain.setPlan(planner.assignments)
+	}
 	return planner.assignments
 }
 
-func newPlacementPlanner(db Database, now time.Time) *placementPlanner {
+func newPlacementPlanner(db Database, now time.Time, explain *placementExplainer, cooldown time.Duration) *placementPlanner {
 	return &placementPlanner{
 		db:             db,
 		now:            now,
+		cooldown:       cooldown,
+		explain:        explain,
+		protected:      map[string]bool{},
 		warmByProfile:  map[string]int{},
 		cacheByProfile: map[string]int{},
 		slotUsed:       map[string]bool{},
@@ -86,11 +112,14 @@ func (p *placementPlanner) policyItems() []policyPlanItem {
 		if !ok {
 			continue
 		}
-		capacity := EffectivePolicyCapacity(p.db, policy, p.now)
+		capacity := effectivePolicyCapacity(p.db, policy, p.now, p.cooldown)
 		item := policyPlanItem{profile: profile, policy: policy, capacity: capacity}
 		item.scarcity = p.profileScarcity(item)
 		item.size = profilePlacementSize(p.db, profile)
-		item.demand = capacity.DemandQueued + capacity.DemandRunning + ceilDiv(capacity.DemandRecent, 4)
+		item.demand = capacity.DemandQueued + capacity.DemandRunning + capacity.DemandSmoothed
+		if p.explain != nil {
+			p.explain.addPolicyItem(item)
+		}
 		items = append(items, item)
 	}
 	return items
@@ -119,10 +148,86 @@ func (p *placementPlanner) placeHardPins(items []policyPlanItem) {
 	}
 }
 
+func (p *placementPlanner) preserveRuntimeCopies(items []policyPlanItem) {
+	byProfile := policyItemsByProfile(items)
+	for _, slot := range SortedSlots(p.db) {
+		if !runtimeCopyProtected(slot) || p.slotUsed[slot.ID] {
+			continue
+		}
+		item, ok := byProfile[slot.ProfileID]
+		if !ok {
+			continue
+		}
+		candidate, ok := p.protectedRuntimeCandidate(item, slot)
+		if !ok || !p.canUseCandidate(item, candidate, true) {
+			continue
+		}
+		a := assignmentFromFit(item.profile.ID, candidate.effective, candidate.slot, candidate.fit, p.now)
+		a.DesiredCached = true
+		a.DesiredWarm = true
+		p.addAssignment(a)
+		p.protected[a.ID] = true
+		p.markWarm(item, candidate)
+		if p.explain != nil {
+			p.explain.addSelected(item.profile.ID, "drain", candidate, true, []string{"preserved_runtime_copy"})
+		}
+	}
+}
+
+func policyItemsByProfile(items []policyPlanItem) map[string]policyPlanItem {
+	out := map[string]policyPlanItem{}
+	for _, item := range items {
+		out[item.profile.ID] = item
+	}
+	return out
+}
+
+func runtimeCopyProtected(slot Slot) bool {
+	if slot.ActiveTaskID != "" {
+		return true
+	}
+	return slot.State == SlotStateServing || slot.State == SlotStateLoading || slot.State == SlotStateWarming
+}
+
+func (p *placementPlanner) protectedRuntimeCandidate(item policyPlanItem, slot Slot) (placementCandidate, bool) {
+	node, ok := p.db.Nodes[slot.NodeID]
+	if !ok || !nodeUsableForPlacement(node, item.policy) {
+		return placementCandidate{}, false
+	}
+	for _, variant := range ProfileRuntimeVariants(item.profile) {
+		effective := EffectiveProfileForVariant(item.profile, variant)
+		if !slotProfileCurrent(slot, item.profile.ID, effective) {
+			continue
+		}
+		fit := FitProfileToSlot(effective, node, slot)
+		return placementCandidate{slot: slot, node: node, profile: item.profile, effective: effective, fit: fit}, fit.Fits
+	}
+	return placementCandidate{}, false
+}
+
+func (p *placementPlanner) markDrainingAssignments(items []policyPlanItem) {
+	targets := warmTargetsByProfile(items)
+	counts := desiredWarmCounts(p.assignments)
+	for i := range p.assignments {
+		a := &p.assignments[i]
+		if !p.protected[a.ID] || !a.DesiredWarm || a.MismatchReason != "" {
+			continue
+		}
+		if counts[a.ProfileID] <= targets[a.ProfileID] {
+			continue
+		}
+		a.Draining = true
+		counts[a.ProfileID]--
+	}
+}
+
 func (p *placementPlanner) placeHardPin(item policyPlanItem, pin string) {
 	slot, ok := p.db.Slots[pin]
 	if !ok {
 		p.addAssignment(missingPlacementAssignment(item.profile.ID, p.nextMissing(item.profile.ID), true, p.now))
+		if p.explain != nil {
+			p.explain.addMissing(item.profile.ID, "hard_pin", true, []string{"hard_pinned_slot_missing"})
+		}
 		return
 	}
 	node := p.db.Nodes[slot.NodeID]
@@ -130,13 +235,28 @@ func (p *placementPlanner) placeHardPin(item policyPlanItem, pin string) {
 	a := assignmentFromFit(item.profile.ID, effective, slot, fit, p.now)
 	a.DesiredCached = true
 	a.DesiredWarm = true
-	if !fit.Fits || !p.canUseCandidate(item, placementCandidate{node: node, slot: slot, effective: effective, fit: fit}, true) {
+	candidate := placementCandidate{node: node, slot: slot, profile: item.profile, effective: effective, fit: fit}
+	if nodeWarmPlacementSuppressed(node, p.now) {
+		a.MismatchReason = FailureWorkerFlapping
+		p.addAssignment(a)
+		if p.explain != nil {
+			p.explain.addRejected(item.profile.ID, "hard_pin", candidate, true, []string{FailureWorkerFlapping})
+		}
+		return
+	}
+	if reasons := p.hardPinRejectionReasons(item, candidate); len(reasons) > 0 {
 		a.MismatchReason = firstNonEmpty(a.MismatchReason, "resource_exhausted_node_budget")
 		p.addAssignment(a)
+		if p.explain != nil {
+			p.explain.addRejected(item.profile.ID, "hard_pin", candidate, true, reasons)
+		}
 		return
 	}
 	p.addAssignment(a)
-	p.markWarm(item, placementCandidate{node: node, slot: slot, effective: effective})
+	if p.explain != nil {
+		p.explain.addSelected(item.profile.ID, "hard_pin", candidate, true, []string{"selected_hard_pin"})
+	}
+	p.markWarm(item, candidate)
 }
 
 func (p *placementPlanner) placeWarmUntil(item policyPlanItem, target int) {
@@ -169,6 +289,9 @@ func (p *placementPlanner) placeCacheUntil(item policyPlanItem, target int) {
 }
 
 func (p *placementPlanner) nextWarmCandidate(item policyPlanItem) (placementCandidate, bool) {
+	if p.explain != nil {
+		return p.nextWarmCandidateExplain(item)
+	}
 	for _, candidate := range placementCandidates(p.db, item.profile, item.policy) {
 		if p.slotUsed[candidate.slot.ID] || !slotAvailableForWarm(candidate.slot, item.profile, candidate.effective) {
 			continue
@@ -181,6 +304,9 @@ func (p *placementPlanner) nextWarmCandidate(item policyPlanItem) (placementCand
 }
 
 func (p *placementPlanner) nextCacheCandidate(item policyPlanItem) (placementCandidate, bool) {
+	if p.explain != nil {
+		return p.nextCacheCandidateExplain(item)
+	}
 	seen := map[string]bool{}
 	for _, candidate := range placementCandidates(p.db, item.profile, item.policy) {
 		if seen[candidate.node.ID] || p.nodeHasProfileCache(candidate.node.ID, item.profile.ID) {
@@ -244,6 +370,9 @@ func placementScore(profileID string, policy PlacementPolicy, c placementCandida
 }
 
 func (p *placementPlanner) canUseCandidate(item policyPlanItem, candidate placementCandidate, warm bool) bool {
+	if warm && nodeWarmPlacementSuppressed(candidate.node, p.now) {
+		return false
+	}
 	if !p.withinProfileLimit(item, candidate.node.ID, warm) {
 		return false
 	}
@@ -254,15 +383,7 @@ func (p *placementPlanner) canUseCandidate(item policyPlanItem, candidate placem
 }
 
 func (p *placementPlanner) withinProfileLimit(item policyPlanItem, nodeID string, warm bool) bool {
-	if warm && item.policy.MaxWarmProfilesPerNode > 0 && !p.nodeHasProfileWarm(nodeID, item.profile.ID) {
-		if len(p.nodeWarm[nodeID]) >= item.policy.MaxWarmProfilesPerNode {
-			return false
-		}
-	}
-	if !p.nodeHasProfileCache(nodeID, item.profile.ID) && item.policy.MaxCachedProfilesPerNode > 0 {
-		return len(p.nodeCache[nodeID]) < item.policy.MaxCachedProfilesPerNode
-	}
-	return true
+	return p.profileLimitRejectionReason(item, nodeID, warm) == ""
 }
 
 func (p *placementPlanner) withinDiskBudget(node Node, profile WorkloadProfile) bool {
@@ -316,6 +437,9 @@ func (p *placementPlanner) nodeHasProfileCache(nodeID, profileID string) bool {
 func (p *placementPlanner) addMissing(profileID string, warm bool) {
 	a := missingPlacementAssignment(profileID, p.nextMissing(profileID), warm, p.now)
 	p.addAssignment(a)
+	if p.explain != nil {
+		p.explain.addMissing(profileID, placementPhase(warm), warm, []string{a.MismatchReason})
+	}
 	p.cacheByProfile[profileID]++
 	if warm {
 		p.warmByProfile[profileID]++

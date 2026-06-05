@@ -33,6 +33,7 @@ func mergeExistingNode(node Node, existing Node, autoApprove bool, now time.Time
 	if quarantineExpiredNode(node, now) {
 		clearNodeQuarantine(&node)
 	}
+	clearExpiredWorkerSuppression(&node, now)
 	if autoApprove {
 		node.Approved = true
 	}
@@ -54,6 +55,10 @@ func copyNodeFailureState(node *Node, existing Node) {
 	node.Quarantined = existing.Quarantined
 	node.QuarantineReason = existing.QuarantineReason
 	node.QuarantineUntil = existing.QuarantineUntil
+	node.RecentFlapEvents = existing.RecentFlapEvents
+	node.WarmPlacementSuppressed = existing.WarmPlacementSuppressed
+	node.WarmPlacementSuppressionReason = existing.WarmPlacementSuppressionReason
+	node.WarmPlacementSuppressionUntil = existing.WarmPlacementSuppressionUntil
 }
 
 func upsertWorkerSlots(db *Database, node Node, slots []Slot, now time.Time) {

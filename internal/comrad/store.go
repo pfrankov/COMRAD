@@ -17,6 +17,7 @@ type Database struct {
 	Slots             map[string]Slot                   `json:"slots"`
 	Artifacts         map[string]Artifact               `json:"artifacts"`
 	ArtifactEvictions map[string]ArtifactEvictionRecord `json:"artifactEvictions,omitempty"`
+	CacheIntents      map[string]CacheIntentRecord      `json:"cacheIntents,omitempty"`
 	Profiles          map[string]WorkloadProfile        `json:"profiles"`
 	Policies          map[string]PlacementPolicy        `json:"policies"`
 	Assignments       map[string]PlacementAssignment    `json:"assignments"`
@@ -94,6 +95,9 @@ func ensureInventoryMaps(db *Database) {
 	}
 	if db.ArtifactEvictions == nil {
 		db.ArtifactEvictions = map[string]ArtifactEvictionRecord{}
+	}
+	if db.CacheIntents == nil {
+		db.CacheIntents = map[string]CacheIntentRecord{}
 	}
 	if db.Profiles == nil {
 		db.Profiles = map[string]WorkloadProfile{}

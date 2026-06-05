@@ -1,7 +1,7 @@
 import { toast } from "sonner"
 
 import { translate } from "@/i18n/i18n-provider"
-import type { Artifact } from "@/types"
+import type { Artifact, CacheArtifactAction } from "@/types"
 
 export type UploadProgress = {
   fileName: string
@@ -335,37 +335,94 @@ export function evictWorkerArtifact(
   artifactId: string,
   actions: Actions
 ) {
+  setCacheArtifactAction(nodeId, [artifactId], "evict", actions)
+}
+
+export function setCacheArtifactAction(
+  nodeId: string,
+  artifactIds: string[],
+  action: CacheArtifactAction,
+  actions: Actions
+) {
+  const targets = artifactIds.filter(Boolean)
+  const label = cacheActionLabel(action)
   actions.setConfirm({
-    title: translate(
-      "nodes.confirm.evictArtifact.title",
-      undefined,
-      "Remove cached artifact"
-    ),
-    body: translate(
-      "nodes.confirm.evictArtifact.body",
-      { artifact: artifactId, worker: nodeId },
-      `This asks ${nodeId} to delete ${artifactId} from its local cache. If the artifact is still assigned or active, the Manager blocks the request.`
-    ),
-    confirmLabel: translate(
-      "nodes.action.evictArtifact",
-      undefined,
-      "Remove from worker"
-    ),
-    variant: "destructive",
+    title:
+      action === "evict"
+        ? translate(
+            "nodes.confirm.evictArtifact.title",
+            undefined,
+            "Remove cached artifact"
+          )
+        : translate(
+            "nodes.confirm.cacheArtifactAction.title",
+            undefined,
+            label
+          ),
+    body:
+      action === "evict" && targets.length === 1
+        ? translate(
+            "nodes.confirm.evictArtifact.body",
+            { artifact: targets[0], worker: nodeId },
+            `This asks ${nodeId} to delete ${targets[0]} from its local cache. If the artifact is still assigned or active, the Manager blocks the request.`
+          )
+        : translate(
+            "nodes.confirm.cacheArtifactAction.body",
+            {
+              action: label.toLowerCase(),
+              worker: nodeId,
+              count: targets.length,
+            },
+            `This asks ${nodeId} to ${label.toLowerCase()} ${targets.length} cached artifact(s).`
+          ),
+    confirmLabel: label,
+    variant: action === "evict" ? "destructive" : "default",
     run: async () => {
-      await actions.api(
-        `/api/admin/nodes/${encodeURIComponent(nodeId)}/artifacts/${encodeURIComponent(artifactId)}`,
-        { method: "DELETE" }
+      await Promise.all(
+        targets.map((artifactId) =>
+          actions.api(
+            `/api/admin/nodes/${encodeURIComponent(nodeId)}/artifacts/${encodeURIComponent(artifactId)}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action }),
+            }
+          )
+        )
       )
       toast.success(
-        translate(
-          "nodes.toast.evictQueued",
-          undefined,
-          "Artifact removal queued"
-        )
+        action === "evict"
+          ? translate(
+              "nodes.toast.evictQueued",
+              undefined,
+              "Artifact removal queued"
+            )
+          : translate(
+              "nodes.toast.cacheActionUpdated",
+              undefined,
+              "Cached artifact action updated"
+            )
       )
     },
   })
+}
+
+function cacheActionLabel(action: CacheArtifactAction) {
+  if (action === "keep" || action === "pin") {
+    return translate("nodes.action.cacheKeep", undefined, "Keep")
+  }
+  if (action === "evict_when_idle") {
+    return translate(
+      "nodes.action.cacheEvictWhenIdle",
+      undefined,
+      "Evict when idle"
+    )
+  }
+  return translate(
+    "nodes.action.evictArtifact",
+    undefined,
+    "Remove from worker"
+  )
 }
 
 export async function triggerUpdate(

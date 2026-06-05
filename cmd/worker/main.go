@@ -13,18 +13,19 @@ import (
 
 func main() {
 	cfg := comrad.WorkerConfig{
-		ManagerURL:       env("COMRAD_MANAGER_URL", "http://127.0.0.1:1922"),
-		Token:            env("COMRAD_WORKER_TOKEN", "dev-worker-token"),
-		NodeID:           os.Getenv("COMRAD_NODE_ID"),
-		Name:             os.Getenv("COMRAD_NODE_NAME"),
-		StatePath:        env("COMRAD_WORKER_STATE_PATH", "data/worker-state.json"),
-		CacheDir:         env("COMRAD_WORKER_CACHE_DIR", "data/worker-cache"),
-		SlotCount:        envInt("COMRAD_WORKER_SLOTS", 1),
-		RAMBytes:         envInt64("COMRAD_WORKER_RAM_BYTES", 8<<30),
-		VRAMBytes:        envInt64("COMRAD_WORKER_VRAM_BYTES", 0),
-		UnifiedBytes:     envInt64("COMRAD_WORKER_UNIFIED_BYTES", 8<<30),
-		DiskBytes:        envInt64("COMRAD_WORKER_DISK_BYTES", 20<<30),
-		EnableSelfUpdate: envBool("COMRAD_ENABLE_SELF_UPDATE", false),
+		ManagerURL:             env("COMRAD_MANAGER_URL", "http://127.0.0.1:1922"),
+		Token:                  env("COMRAD_WORKER_TOKEN", "dev-worker-token"),
+		NodeID:                 os.Getenv("COMRAD_NODE_ID"),
+		Name:                   os.Getenv("COMRAD_NODE_NAME"),
+		StatePath:              env("COMRAD_WORKER_STATE_PATH", "data/worker-state.json"),
+		CacheDir:               env("COMRAD_WORKER_CACHE_DIR", "data/worker-cache"),
+		SlotCount:              envInt("COMRAD_WORKER_SLOTS", 1),
+		MaxConcurrentDownloads: envInt("COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS", 1),
+		RAMBytes:               envInt64("COMRAD_WORKER_RAM_BYTES", 8<<30),
+		VRAMBytes:              envInt64("COMRAD_WORKER_VRAM_BYTES", 0),
+		UnifiedBytes:           envInt64("COMRAD_WORKER_UNIFIED_BYTES", 8<<30),
+		DiskBytes:              envInt64("COMRAD_WORKER_DISK_BYTES", 20<<30),
+		EnableSelfUpdate:       envBool("COMRAD_ENABLE_SELF_UPDATE", false),
 	}
 	worker, err := comrad.NewWorker(cfg)
 	if err != nil {

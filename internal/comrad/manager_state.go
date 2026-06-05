@@ -15,10 +15,11 @@ import (
 
 func (m *Manager) stateResponse() StateResponse {
 	m.clearExpiredQuarantines()
+	m.clearExpiredWorkerSuppressions(time.Now().UTC())
 	db := m.store.Snapshot()
-	decoratePolicyEffectiveCapacity(&db, time.Now().UTC())
+	decoratePolicyEffectiveCapacityWithCooldown(&db, time.Now().UTC(), managerAutoBalanceCooldown(m.cfg))
 	fitMatrix := BuildFitMatrix(db)
-	cachePlans := BuildCachePlans(db)
+	cachePlans := BuildCachePlansWithConfig(db, m.cfg)
 	sortCachePlans(cachePlans)
 	runtimeSummary := BuildRuntimeSummary(db)
 	decorateAdminStateConditions(&db, fitMatrix, cachePlans)

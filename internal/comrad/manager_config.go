@@ -38,10 +38,18 @@ type AuthConfigYAML struct {
 }
 
 type SchedulerConfigYAML struct {
-	QueueLimit             int                  `yaml:"queueLimit"`
-	StreamWaitSeconds      int64                `yaml:"streamWaitSeconds"`
-	WorkerHeartbeatSeconds int64                `yaml:"workerHeartbeatSeconds"`
-	Quarantine             QuarantineConfigYAML `yaml:"quarantine"`
+	QueueLimit                          int                  `yaml:"queueLimit"`
+	StreamWaitSeconds                   int64                `yaml:"streamWaitSeconds"`
+	AutoBalanceScaleDownCooldownSeconds int64                `yaml:"autoBalanceScaleDownCooldownSeconds"`
+	WorkerHeartbeatSeconds              int64                `yaml:"workerHeartbeatSeconds"`
+	WorkerFlap                          WorkerFlapConfigYAML `yaml:"workerFlap"`
+	Quarantine                          QuarantineConfigYAML `yaml:"quarantine"`
+}
+
+type WorkerFlapConfigYAML struct {
+	Threshold       int   `yaml:"threshold"`
+	WindowSeconds   int64 `yaml:"windowSeconds"`
+	CooldownSeconds int64 `yaml:"cooldownSeconds"`
 }
 
 type QuarantineConfigYAML struct {
@@ -97,9 +105,15 @@ func (m *Manager) runtimeConfigYAML() RuntimeConfigYAML {
 			AllowDevDefaults:      cfg.AllowDevTokens,
 		},
 		Scheduler: SchedulerConfigYAML{
-			QueueLimit:             cfg.QueueLimit,
-			StreamWaitSeconds:      int64(cfg.StreamWait.Seconds()),
-			WorkerHeartbeatSeconds: int64(cfg.WorkerHeartbeatTimeout.Seconds()),
+			QueueLimit:                          cfg.QueueLimit,
+			StreamWaitSeconds:                   int64(cfg.StreamWait.Seconds()),
+			AutoBalanceScaleDownCooldownSeconds: int64(cfg.AutoBalanceScaleDownCooldown.Seconds()),
+			WorkerHeartbeatSeconds:              int64(cfg.WorkerHeartbeatTimeout.Seconds()),
+			WorkerFlap: WorkerFlapConfigYAML{
+				Threshold:       cfg.WorkerFlapThreshold,
+				WindowSeconds:   int64(cfg.WorkerFlapWindow.Seconds()),
+				CooldownSeconds: int64(cfg.WorkerFlapCooldown.Seconds()),
+			},
 			Quarantine: QuarantineConfigYAML{
 				Threshold: cfg.QuarantineThreshold,
 				Seconds:   int64(cfg.QuarantineDuration.Seconds()),

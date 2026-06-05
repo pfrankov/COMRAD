@@ -14,15 +14,16 @@ const (
 	NodeStateDisabled   = "disabled"
 	NodeStateError      = "error"
 
-	SlotStateUnavailable = "unavailable"
-	SlotStateIdle        = "idle"
-	SlotStateDownloading = "downloading_artifact"
-	SlotStateCached      = "cached"
-	SlotStateLoading     = "loading_runtime"
-	SlotStateWarming     = "warming"
-	SlotStateReady       = "ready"
-	SlotStateServing     = "serving"
-	SlotStateError       = "error"
+	SlotStateUnavailable    = "unavailable"
+	SlotStateIdle           = "idle"
+	SlotStateDownloadQueued = "download_queued"
+	SlotStateDownloading    = "downloading_artifact"
+	SlotStateCached         = "cached"
+	SlotStateLoading        = "loading_runtime"
+	SlotStateWarming        = "warming"
+	SlotStateReady          = "ready"
+	SlotStateServing        = "serving"
+	SlotStateError          = "error"
 
 	TaskStatusQueued    = "queued"
 	TaskStatusRunning   = "running"
@@ -45,6 +46,7 @@ const (
 	FailureFirstOutputTimeout     = "first_output_timeout"
 	FailureLeaseExpired           = "lease_expired"
 	FailureQuarantined            = "quarantined"
+	FailureWorkerFlapping         = "worker_flapping"
 
 	APIKeyStatusActive  = "active"
 	APIKeyStatusRevoked = "revoked"
@@ -65,32 +67,48 @@ type ResourceBudget struct {
 	SlotCount          int   `json:"slotCount"`
 }
 
+type DownloadPressure struct {
+	MaxConcurrent int `json:"maxConcurrent"`
+	Active        int `json:"active"`
+	Queued        int `json:"queued"`
+}
+
 type Node struct {
-	ID               string         `json:"nodeId"`
-	OwnerUserID      string         `json:"ownerUserId,omitempty"`
-	Name             string         `json:"name"`
-	OS               string         `json:"os"`
-	Arch             string         `json:"arch"`
-	Target           string         `json:"target"`
-	Mode             string         `json:"mode"`
-	Tags             []string       `json:"tags"`
-	State            string         `json:"state"`
-	Version          string         `json:"version"`
-	RuntimeAdapters  []string       `json:"runtimeAdapters"`
-	Budgets          ResourceBudget `json:"budgets"`
-	CachedArtifacts  []string       `json:"cachedArtifacts"`
-	WarmProfiles     []string       `json:"warmProfiles"`
-	LastSeen         time.Time      `json:"lastSeen"`
-	Approved         bool           `json:"approved"`
-	UpdateRequired   bool           `json:"updateRequired"`
-	UpdateStatus     string         `json:"updateStatus,omitempty"`
-	LastFailure      string         `json:"lastFailure,omitempty"`
-	LastFailureAt    *time.Time     `json:"lastFailureAt,omitempty"`
-	Quarantined      bool           `json:"quarantined"`
-	QuarantineReason string         `json:"quarantineReason,omitempty"`
-	QuarantineUntil  *time.Time     `json:"quarantineUntil,omitempty"`
-	Conditions       []Condition    `json:"conditions,omitempty"`
-	ConnectedSession string         `json:"-"`
+	ID                             string            `json:"nodeId"`
+	OwnerUserID                    string            `json:"ownerUserId,omitempty"`
+	Name                           string            `json:"name"`
+	OS                             string            `json:"os"`
+	Arch                           string            `json:"arch"`
+	Target                         string            `json:"target"`
+	Mode                           string            `json:"mode"`
+	Tags                           []string          `json:"tags"`
+	State                          string            `json:"state"`
+	Version                        string            `json:"version"`
+	RuntimeAdapters                []string          `json:"runtimeAdapters"`
+	Budgets                        ResourceBudget    `json:"budgets"`
+	DownloadPressure               DownloadPressure  `json:"downloadPressure"`
+	CachedArtifacts                []string          `json:"cachedArtifacts"`
+	WarmProfiles                   []string          `json:"warmProfiles"`
+	LastSeen                       time.Time         `json:"lastSeen"`
+	Approved                       bool              `json:"approved"`
+	UpdateRequired                 bool              `json:"updateRequired"`
+	UpdateStatus                   string            `json:"updateStatus,omitempty"`
+	LastFailure                    string            `json:"lastFailure,omitempty"`
+	LastFailureAt                  *time.Time        `json:"lastFailureAt,omitempty"`
+	Quarantined                    bool              `json:"quarantined"`
+	QuarantineReason               string            `json:"quarantineReason,omitempty"`
+	QuarantineUntil                *time.Time        `json:"quarantineUntil,omitempty"`
+	RecentFlapEvents               []WorkerFlapEvent `json:"recentFlapEvents,omitempty"`
+	WarmPlacementSuppressed        bool              `json:"warmPlacementSuppressed,omitempty"`
+	WarmPlacementSuppressionReason string            `json:"warmPlacementSuppressionReason,omitempty"`
+	WarmPlacementSuppressionUntil  *time.Time        `json:"warmPlacementSuppressionUntil,omitempty"`
+	Conditions                     []Condition       `json:"conditions,omitempty"`
+	ConnectedSession               string            `json:"-"`
+}
+
+type WorkerFlapEvent struct {
+	Type string    `json:"type"`
+	At   time.Time `json:"at"`
 }
 
 type Slot struct {
@@ -141,6 +159,15 @@ type ArtifactEvictionRecord struct {
 	RequestedAt time.Time   `json:"requestedAt"`
 	UpdatedAt   time.Time   `json:"updatedAt"`
 	Conditions  []Condition `json:"conditions,omitempty"`
+}
+
+type CacheIntentRecord struct {
+	ID          string    `json:"cacheIntentId"`
+	NodeID      string    `json:"nodeId"`
+	ArtifactID  string    `json:"artifactId"`
+	Action      string    `json:"action"`
+	RequestedAt time.Time `json:"requestedAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Requirements struct {
@@ -222,6 +249,7 @@ type PlacementPolicy struct {
 	DemandQueued             int                  `json:"demandQueued,omitempty"`
 	DemandRunning            int                  `json:"demandRunning,omitempty"`
 	DemandRecent             int                  `json:"demandRecent,omitempty"`
+	DemandSmoothed           int                  `json:"demandSmoothed,omitempty"`
 	Constraints              PlacementConstraints `json:"constraints"`
 	HardPinnedSlots          []string             `json:"hardPinnedSlots,omitempty"`
 	CreatedAt                time.Time            `json:"createdAt"`
@@ -243,6 +271,7 @@ type PlacementAssignment struct {
 	ActualCached     bool      `json:"actualCached"`
 	ActualWarm       bool      `json:"actualWarm"`
 	Ready            bool      `json:"ready"`
+	Draining         bool      `json:"draining,omitempty"`
 	MismatchReason   string    `json:"mismatchReason,omitempty"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }

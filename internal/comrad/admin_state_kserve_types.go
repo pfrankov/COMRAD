@@ -62,11 +62,17 @@ type CacheWorkerStatus struct {
 	Warm     bool                `json:"warm" yaml:"warm"`
 	Active   bool                `json:"active" yaml:"active"`
 	Eviction CacheEvictionStatus `json:"eviction" yaml:"eviction"`
+	Intent   CacheIntentStatus   `json:"intent" yaml:"intent"`
 }
 
 type CacheEvictionStatus struct {
 	Status    string    `json:"status" yaml:"status"`
 	Reason    string    `json:"reason,omitempty" yaml:"reason,omitempty"`
 	Failure   string    `json:"failure,omitempty" yaml:"failure,omitempty"`
+	UpdatedAt time.Time `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+}
+
+type CacheIntentStatus struct {
+	Action    string    `json:"action,omitempty" yaml:"action,omitempty"`
 	UpdatedAt time.Time `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
 }

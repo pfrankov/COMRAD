@@ -71,7 +71,7 @@ func TestAutoBalanceRespectsLimitsAndDoesNotStealMinimumCapacity(t *testing.T) {
 	addPlacementNode(&db, "node-b-small", 4, 10, 1)
 	for i := 0; i < 8; i++ {
 		id := NewID("task")
-		db.Tasks[id] = Task{ID: id, ProfileID: "hot", Status: TaskStatusCompleted, CreatedAt: now.Add(-time.Minute), UpdatedAt: now.Add(-time.Minute)}
+		db.Tasks[id] = Task{ID: id, ProfileID: "hot", Status: TaskStatusCompleted, CreatedAt: now.Add(-time.Duration(i%4) * 2 * time.Minute), UpdatedAt: now.Add(-time.Duration(i%4) * 2 * time.Minute)}
 	}
 
 	plan := PlanPlacement(db)
@@ -84,6 +84,66 @@ func TestAutoBalanceRespectsLimitsAndDoesNotStealMinimumCapacity(t *testing.T) {
 	}
 	if got := warmReadyNodeCount(plan, "hot"); got != 1 {
 		t.Fatalf("hot concrete warm nodes = %d, want 1 after preserving big minimum; plan=%+v", got, plan)
+	}
+}
+
+func TestAutoBalanceSustainedDemandRaisesWarmCount(t *testing.T) {
+	now := time.Now().UTC()
+	db := placementTestDatabase(now)
+	addPlacementProfile(&db, "hot", "sha256:hot", 2, 2, now)
+	policy := PlacementPolicy{ID: "pol-hot", ProfileID: "hot", AutoBalance: true, MaxWarmCount: 4, MaxCachedCount: 4, CreatedAt: now, UpdatedAt: now}
+	for i := 0; i < 16; i++ {
+		at := now.Add(-time.Duration(i%4) * 2 * time.Minute)
+		id := NewID("task")
+		db.Tasks[id] = Task{ID: id, ProfileID: "hot", Status: TaskStatusCompleted, CreatedAt: at, UpdatedAt: at}
+	}
+
+	capacity := EffectivePolicyCapacity(db, policy, now)
+
+	if capacity.Warm != 4 {
+		t.Fatalf("warm capacity = %d, want 4 for sustained recent demand", capacity.Warm)
+	}
+	if capacity.DemandSmoothed != 4 {
+		t.Fatalf("smoothed demand = %d, want 4", capacity.DemandSmoothed)
+	}
+}
+
+func TestAutoBalanceDampsBriefDemandSpike(t *testing.T) {
+	now := time.Now().UTC()
+	db := placementTestDatabase(now)
+	addPlacementProfile(&db, "hot", "sha256:hot", 2, 2, now)
+	policy := PlacementPolicy{ID: "pol-hot", ProfileID: "hot", AutoBalance: true, MaxWarmCount: 4, MaxCachedCount: 4, CreatedAt: now, UpdatedAt: now}
+	for i := 0; i < 16; i++ {
+		at := now.Add(-30 * time.Second)
+		id := NewID("task")
+		db.Tasks[id] = Task{ID: id, ProfileID: "hot", Status: TaskStatusCompleted, CreatedAt: at, UpdatedAt: at}
+	}
+
+	capacity := EffectivePolicyCapacity(db, policy, now)
+
+	if capacity.Warm >= 4 {
+		t.Fatalf("warm capacity = %d, want brief spike damped below raw recent demand 4", capacity.Warm)
+	}
+	if capacity.DemandSmoothed != 1 {
+		t.Fatalf("smoothed demand = %d, want 1 for one-bucket burst", capacity.DemandSmoothed)
+	}
+}
+
+func TestAutoBalanceQueuedPressureRaisesWarmWithinLimits(t *testing.T) {
+	now := time.Now().UTC()
+	db := placementTestDatabase(now)
+	addPlacementProfile(&db, "hot", "sha256:hot", 2, 2, now)
+	policy := PlacementPolicy{ID: "pol-hot", ProfileID: "hot", AutoBalance: true, MinWarmCount: 1, MaxWarmCount: 3, MinCachedCount: 1, MaxCachedCount: 3, CreatedAt: now, UpdatedAt: now}
+	for i := 0; i < 4; i++ {
+		at := now.Add(-30 * time.Second)
+		id := NewID("task")
+		db.Tasks[id] = Task{ID: id, ProfileID: "hot", Status: TaskStatusQueued, CreatedAt: at, UpdatedAt: at}
+	}
+
+	capacity := EffectivePolicyCapacity(db, policy, now)
+
+	if capacity.Warm != 3 || capacity.Cached != 3 {
+		t.Fatalf("capacity = cached:%d warm:%d, want both clamped to 3 from queue pressure", capacity.Cached, capacity.Warm)
 	}
 }
 

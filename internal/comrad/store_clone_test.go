@@ -15,6 +15,7 @@ func TestStoreSnapshotDeepCopiesMutableFields(t *testing.T) {
 	if err := store.Update(func(db *Database) error {
 		db.Nodes["node-a"] = Node{ID: "node-a", Tags: []string{"fast"}, CachedArtifacts: []string{"sha256:a"}, ConnectedSession: "session-a"}
 		db.Slots["slot-a"] = Slot{ID: "slot-a", FailureCounters: map[string]int{"runtime": 1}, LastFailureAt: &now}
+		db.CacheIntents["cache-a"] = CacheIntentRecord{ID: "cache-a", NodeID: "node-a", ArtifactID: "sha256:a", Action: CacheIntentKeep}
 		db.Profiles["profile-a"] = WorkloadProfile{
 			ID:           "profile-a",
 			Artifacts:    []string{"sha256:a"},
@@ -43,6 +44,7 @@ func TestStoreSnapshotDeepCopiesMutableFields(t *testing.T) {
 	snapshot.Nodes["node-a"].Tags[0] = "mutated"
 	snapshot.Nodes["node-a"].CachedArtifacts[0] = "sha256:mutated"
 	snapshot.Slots["slot-a"].FailureCounters["runtime"] = 9
+	snapshot.CacheIntents["cache-a"] = CacheIntentRecord{ID: "cache-a", Action: "mutated"}
 	snapshot.Profiles["profile-a"].Artifacts[0] = "sha256:mutated"
 	snapshot.Profiles["profile-a"].Requirements.RequireTags[0] = "mutated"
 	snapshot.Profiles["profile-a"].Runtime.LlamaCpp.Args[1] = "1"
@@ -60,6 +62,7 @@ func TestStoreSnapshotDeepCopiesMutableFields(t *testing.T) {
 	if fresh.Nodes["node-a"].Tags[0] != "fast" ||
 		fresh.Nodes["node-a"].CachedArtifacts[0] != "sha256:a" ||
 		fresh.Slots["slot-a"].FailureCounters["runtime"] != 1 ||
+		fresh.CacheIntents["cache-a"].Action != CacheIntentKeep ||
 		fresh.Profiles["profile-a"].Artifacts[0] != "sha256:a" ||
 		fresh.Profiles["profile-a"].Requirements.RequireTags[0] != "fast" ||
 		fresh.Profiles["profile-a"].Runtime.LlamaCpp.Args[1] != "99" ||

@@ -80,6 +80,10 @@ type CreateArtifactRequest struct {
 	SHA256 string `json:"sha256" yaml:"sha256"`
 }
 
+type CacheArtifactActionRequest struct {
+	Action string `json:"action" yaml:"action"`
+}
+
 type CreateProfileRequest struct {
 	ID                    string                `json:"profileId" yaml:"profileId"`
 	ComputeCost           int64                 `json:"computeCost" yaml:"computeCost"`

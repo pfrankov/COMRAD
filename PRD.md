@@ -111,7 +111,7 @@ When a client requests a logical model, the Manager must select a compatible run
 
 Artifacts are immutable and content-addressed by sha256. The Manager uploads or registers model/update artifacts from Manager-local paths. Workers must reject corrupted artifacts and must not run an artifact whose digest does not match Manager metadata.
 
-When a profile is deleted or capacity no longer desires an artifact on a Worker, the Manager must queue guarded Worker cache eviction. Workers must stop stale warm runtimes before deleting the cached file and must refuse eviction while an artifact is serving active work. Cleanup records must remain visible as queued, blocked, evicted, or failed.
+When a profile is deleted or capacity no longer desires an artifact on a Worker, the Manager must queue guarded Worker cache eviction. Operators must be able to keep stale cache, evict it now, or request eviction when idle for one selected Worker. Workers must stop stale warm runtimes before deleting the cached file, and the Manager must not evict artifacts that are still assigned, warming, or serving active work. Cleanup records must remain visible as queued, blocked, evicted, or failed.
 
 ### Scheduling, Queueing, Retry, And Quarantine
 
@@ -130,6 +130,7 @@ The Manager must:
 - fail the stream after first output failure;
 - exclude previously failed slots from automatic retry for the same task;
 - mark silent Worker connections offline after missed heartbeats and replan capacity;
+- suppress new warm placement on Workers that repeatedly disconnect, reconnect, or miss heartbeat expiry checks within a configured flap window;
 - quarantine Workers or slots that repeatedly report ready but fail execution;
 - keep quarantined slots out of scheduling;
 - expose quarantine reason, counters, last failure, and expiration;

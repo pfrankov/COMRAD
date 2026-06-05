@@ -14,6 +14,7 @@ var (
 
 func (m *Manager) selectReadySlot(profile WorkloadProfile, taskID string) (Slot, WorkloadProfile, *workerSession, bool) {
 	m.clearExpiredQuarantines()
+	m.clearExpiredWorkerSuppressions(time.Now().UTC())
 	m.expireWorkerHeartbeats(time.Now().UTC())
 	db := m.store.Snapshot()
 	candidates := readySlotCandidates(db, profile, failedSlotsForTask(db, taskID))
@@ -191,13 +192,15 @@ func (m *Manager) cancelAttempt(nodeID, taskID, attemptID, reason string) {
 
 func (m *Manager) replanAndDispatch() {
 	m.clearExpiredQuarantines()
+	m.clearExpiredWorkerSuppressions(time.Now().UTC())
 	db := m.store.Snapshot()
-	plan := PlanPlacement(db)
+	plan := PlanPlacementWithConfig(db, m.cfg)
 	_ = m.store.Update(func(db *Database) error {
 		db.Assignments = map[string]PlacementAssignment{}
 		for _, a := range plan {
 			db.Assignments[a.ID] = a
 		}
+		applyPlacementDrainState(db)
 		return nil
 	})
 	for _, a := range plan {

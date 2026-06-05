@@ -27,7 +27,7 @@ func workerAssignProfile(w *Worker, ctx context.Context, msg Envelope) error {
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		return err
 	}
-	if err := w.handleAssignment(ctx, payload); err != nil {
+	if err := w.queueAssignment(ctx, payload); err != nil {
 		return err
 	}
 	w.enqueue(Envelope{ID: msg.ID, Type: MsgAck, NodeID: w.node.ID})

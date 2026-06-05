@@ -14,6 +14,17 @@ export type Condition = {
   lastTransitionTime?: string
 }
 
+export type WorkerFlapEvent = {
+  type: string
+  at: string
+}
+
+export type DownloadPressure = {
+  maxConcurrent?: number
+  active?: number
+  queued?: number
+}
+
 export type Node = {
   nodeId: string
   ownerUserId?: string
@@ -27,6 +38,7 @@ export type Node = {
   version?: string
   runtimeAdapters?: string[]
   budgets?: ResourceBudget
+  downloadPressure?: DownloadPressure
   cachedArtifacts?: string[]
   warmProfiles?: string[]
   lastSeen?: string
@@ -37,6 +49,10 @@ export type Node = {
   quarantined?: boolean
   quarantineReason?: string
   quarantineUntil?: string
+  recentFlapEvents?: WorkerFlapEvent[]
+  warmPlacementSuppressed?: boolean
+  warmPlacementSuppressionReason?: string
+  warmPlacementSuppressionUntil?: string
   conditions?: Condition[]
 }
 
@@ -170,7 +186,13 @@ export type CacheWorkerStatus = {
     failure?: string
     updatedAt?: string
   }
+  intent?: {
+    action?: CacheArtifactAction
+    updatedAt?: string
+  }
 }
+
+export type CacheArtifactAction = "keep" | "pin" | "evict" | "evict_when_idle"
 
 export type Assignment = {
   assignmentId: string
@@ -205,6 +227,7 @@ export type Policy = {
   demandQueued?: number
   demandRunning?: number
   demandRecent?: number
+  demandSmoothed?: number
   conditions?: Condition[]
 }
 
@@ -215,6 +238,44 @@ export type FitResult = {
   slotId?: string
   nodeId?: string
   fits?: boolean
+  reasons?: string[]
+}
+
+export type PlacementExplainResponse = {
+  generatedAt?: string
+  plan?: Assignment[]
+  profiles?: PlacementProfileExplanation[]
+}
+
+export type PlacementProfileExplanation = {
+  profileId: string
+  policyId?: string
+  logicalModel?: string
+  desiredCached?: number
+  desiredWarm?: number
+  selected?: PlacementCandidateExplanation[]
+  rejected?: PlacementCandidateExplanation[]
+  missing?: PlacementMissingExplanation[]
+}
+
+export type PlacementCandidateExplanation = {
+  phase?: string
+  nodeId?: string
+  slotId?: string
+  runtimeVariantId?: string
+  modelArtifactId?: string
+  desiredCached?: boolean
+  desiredWarm?: boolean
+  actualCached?: boolean
+  actualWarm?: boolean
+  ready?: boolean
+  reasons?: string[]
+}
+
+export type PlacementMissingExplanation = {
+  phase?: string
+  desiredCached?: boolean
+  desiredWarm?: boolean
   reasons?: string[]
 }
 

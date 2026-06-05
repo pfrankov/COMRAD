@@ -82,7 +82,7 @@ func getOpenAPISpec(t *testing.T, serverURL string) ([]byte, map[string]any) {
 func assertOpenAPIPaths(t *testing.T, spec map[string]any) {
 	t.Helper()
 	paths := spec["paths"].(map[string]any)
-	for _, path := range []string{"/v1/models", "/v1/chat/completions", "/api/admin/state/ws-ticket", "/api/admin/config.yaml", "/api/admin/artifacts/upload", "/api/admin/artifacts/{artifactId}", "/api/admin/nodes/{nodeId}/artifacts/{artifactId}", "/api/admin/profiles", "/api/admin/api-keys/lookup", "/api/worker/ws"} {
+	for _, path := range []string{"/v1/models", "/v1/chat/completions", "/api/admin/state/ws-ticket", "/api/admin/config.yaml", "/api/admin/artifacts/upload", "/api/admin/artifacts/{artifactId}", "/api/admin/nodes/{nodeId}/artifacts/{artifactId}", "/api/admin/profiles", "/api/admin/api-keys/lookup", "/api/admin/placement/explain", "/api/worker/ws"} {
 		if _, ok := paths[path]; !ok {
 			t.Fatalf("spec missing path %s", path)
 		}
@@ -92,6 +92,15 @@ func assertOpenAPIPaths(t *testing.T, spec map[string]any) {
 	}
 	if _, ok := paths["/api/admin/nodes/{nodeId}/artifacts/{artifactId}"].(map[string]any)["delete"]; !ok {
 		t.Fatal("spec missing worker artifact eviction operation")
+	}
+	if _, ok := paths["/api/admin/nodes/{nodeId}/artifacts/{artifactId}"].(map[string]any)["post"]; !ok {
+		t.Fatal("spec missing worker cache action operation")
+	}
+	components := spec["components"].(map[string]any)["schemas"].(map[string]any)
+	for _, schema := range []string{"PlacementExplainResponse", "PlacementProfileExplanation", "PlacementCandidateExplanation"} {
+		if _, ok := components[schema]; !ok {
+			t.Fatalf("spec missing schema %s", schema)
+		}
 	}
 }
 

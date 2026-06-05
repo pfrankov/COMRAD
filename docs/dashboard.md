@@ -16,7 +16,7 @@ The top bar shows the Manager state stream status. **Live** means snapshots are 
 
 Dashboard pages render from the live WebSocket state by default. The **Tasks** page uses the live recent task window for its first history page, user summary, and timelines so new requests and reports appear without a manual refresh. Server-side `/api/admin/tasks` reads are still used for filters and deeper pagination, and those reads refresh when the live task state changes.
 
-The Manager exposes dashboard stream health in Prometheus metrics. Watch `comrad_admin_state_ws_clients`, `comrad_admin_state_ws_connects_total`, `comrad_admin_state_ws_broadcasts_total`, `comrad_admin_state_ws_dropped_updates_total`, `comrad_admin_state_ws_write_failures_total`, and the last snapshot size/subscriber gauges when diagnosing stale UI state.
+The Manager exposes dashboard stream health in Prometheus metrics. Watch `comrad_admin_state_ws_clients`, `comrad_admin_state_ws_connects_total`, `comrad_admin_state_ws_broadcasts_total`, `comrad_admin_state_ws_dropped_updates_total`, `comrad_admin_state_ws_write_failures_total`, and the last snapshot size/subscriber gauges when diagnosing stale UI state. Capacity plan drift is exposed with bounded `model` and `profile` labels through `comrad_capacity_desired_cached`, `comrad_capacity_actual_cached`, `comrad_capacity_desired_warm`, `comrad_capacity_actual_warm`, `comrad_capacity_warming`, `comrad_capacity_failed`, and `comrad_capacity_blocked`.
 
 ## Sections
 
@@ -85,7 +85,7 @@ Delete a model or stale Worker cache:
 2. Confirm the destructive action. The Manager removes the profile and capacity policy, then queues eviction for Worker cache entries that are no longer desired or active.
 3. For one machine only, open **Nodes**, click **Technical details**, and use **Remove from worker** on a cached artifact.
 4. Check **Worker conditions** and **Cache cleanup** in the same details dialog for queued, blocked, evicted, or failed cleanup records, including artifacts that have already disappeared from the current cache list.
-5. COMRAD blocks removal while the artifact is still assigned, active, or the Worker is offline.
+5. COMRAD blocks removal while the artifact is still assigned, warming, active, or the Worker is offline.
 
 Register an API client and key:
 
@@ -116,7 +116,9 @@ Adjust capacity:
 
 **Nodes** shows remaining planned memory and disk for each Worker. Offline
 Workers show the last-seen time, and offline Workers are excluded from placement
-until they reconnect and report fresh state.
+until they reconnect and report fresh state. Workers that flap repeatedly show
+warm-placement suppression reason and expiration before they are trusted for new
+warm runtimes again.
 
 Handle quarantine:
 

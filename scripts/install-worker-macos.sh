@@ -20,6 +20,7 @@ INSTALL_DIR="${COMRAD_INSTALL_DIR:-$HOME/Library/Application Support/COMRAD}"
 PLIST="$HOME/Library/LaunchAgents/com.comrad.worker.plist"
 MANAGER_URL="${COMRAD_MANAGER_URL:-http://127.0.0.1:1922}"
 WORKER_TOKEN="${COMRAD_WORKER_TOKEN:-dev-worker-token}"
+MAX_CONCURRENT_DOWNLOADS="${COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS:-1}"
 UNIFIED_BYTES="${COMRAD_WORKER_UNIFIED_BYTES:-8589934592}"
 DISK_BYTES="${COMRAD_WORKER_DISK_BYTES:-21474836480}"
 if [ -n "${COMRAD_LLAMA_CPP_URL:-}" ]; then
@@ -137,6 +138,7 @@ cat > "$PLIST" <<EOF
     <key>COMRAD_WORKER_TOKEN</key><string>$WORKER_TOKEN</string>
     <key>COMRAD_WORKER_STATE_PATH</key><string>$INSTALL_DIR/data/worker-state.json</string>
     <key>COMRAD_WORKER_CACHE_DIR</key><string>$INSTALL_DIR/data/cache</string>
+    <key>COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS</key><string>$MAX_CONCURRENT_DOWNLOADS</string>
     <key>COMRAD_WORKER_UNIFIED_BYTES</key><string>$UNIFIED_BYTES</string>
     <key>COMRAD_WORKER_DISK_BYTES</key><string>$DISK_BYTES</string>
   </dict>

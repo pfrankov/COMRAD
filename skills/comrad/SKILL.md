@@ -77,10 +77,13 @@ Install a macOS Worker LaunchAgent:
 cd dist/bundle-darwin-arm64
 COMRAD_MANAGER_URL="$BASE_URL" \
 COMRAD_WORKER_TOKEN="$WORKER_TOKEN" \
+COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS=1 \
 COMRAD_WORKER_UNIFIED_BYTES=17179869184 \
 COMRAD_WORKER_DISK_BYTES=21474836480 \
 scripts/install-worker-macos.sh
 ```
+
+Workers default to one concurrent model artifact download per node; raise `COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS` only after confirming the node and Manager artifact path can absorb parallel model transfers.
 
 The macOS bundle includes `bin/llama-server`. The installer copies it by default and verifies startup. Use `COMRAD_LLAMA_CPP_URL` and `COMRAD_LLAMA_CPP_SHA256` to install a different llama.cpp archive; if a custom bundle is missing `bin/llama-server`, the installer downloads the pinned archive as a fallback.
 
@@ -90,7 +93,7 @@ Open the dashboard:
 http://127.0.0.1:1922/
 ```
 
-Go to **Settings** and save the admin token there. The dashboard uses the admin bearer token to get short-lived tickets for browser-only surfaces, then streams state over `/api/admin/state/ws`; use `/api/admin/state` for one-off API snapshots. The top bar shows whether that state stream is live, connecting, reconnecting, or disconnected. Dashboard pages should render from live WebSocket state by default; the **Tasks** page uses `/api/admin/tasks` only for filters and deeper pagination. Settings also shows the sanitized runtime YAML config from `/api/admin/config.yaml` as read-only highlighted text.
+Go to **Settings** and save the admin token there. The dashboard uses the admin bearer token to get short-lived tickets for browser-only surfaces, then streams state over `/api/admin/state/ws`; use `/api/admin/state` for one-off API snapshots. The top bar shows whether that state stream is live, connecting, reconnecting, or disconnected. Dashboard pages should render from live WebSocket state by default; the **Tasks** page uses `/api/admin/tasks` only for filters and deeper pagination. Settings also shows the sanitized runtime YAML config from `/api/admin/config.yaml` as read-only highlighted text. Nodes can show warm-placement suppression when recent Worker flapping temporarily blocks new warm runtimes.
 
 Register a model in the dashboard:
 
@@ -200,6 +203,10 @@ curl -fsS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/api/admin/profiles?profileId=llm.chat/local/context-4096"
 curl -fsS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/api/admin/nodes/<node-id>/artifacts/sha256:<artifact>"
+curl -fsS -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"keep"}' \
+  "$BASE_URL/api/admin/nodes/<node-id>/artifacts/sha256:<artifact>"
 ```
 
 Minimal `profile.yaml`:
@@ -226,7 +233,7 @@ warmable: true
 
 Do not put model sha, tokenizer, config hash, or quantization in profile config; model identity comes from `modelArtifacts`. `llama-server` belongs to Worker installation, not model registration.
 
-Deleting a profile removes its capacity policy and assignments, then queues eviction for Worker cache files that are no longer desired or active. Setting `cachedCount` and `warmCount` to `0` stops keeping a manual policy hot; for auto-balance policies also set min/max counts to `0`. Manual node artifact eviction is for one selected Worker and is blocked when the Worker is offline or the artifact is assigned or active there. Cache cleanup records are exposed in `/api/admin/state` as `artifactEvictions`.
+Deleting a profile removes its capacity policy and assignments, then queues eviction for Worker cache files that are no longer desired, warming, or active. Setting `cachedCount` and `warmCount` to `0` stops keeping a manual policy hot; for auto-balance policies also set min/max counts to `0`. Manual node artifact eviction is for one selected Worker and is blocked when the Worker is offline or the artifact is assigned, warming, or active there. POST the same node artifact URL with `{"action":"keep"}`, `{"action":"evict"}`, or `{"action":"evict_when_idle"}` to persist stale-cache intent or request guarded cleanup. Cache cleanup records are exposed in `/api/admin/state` as `artifactEvictions`.
 
 API clients, keys, and compute:
 
@@ -268,6 +275,8 @@ maxCachedProfilesPerNode: 0
 maxWarmProfilesPerNode: 0
 ```
 
+Auto-balance scales up immediately from queued, running, and smoothed recent demand. Scale-down waits for `COMRAD_AUTO_BALANCE_SCALE_DOWN_COOLDOWN_SECONDS` (default `300`) before removing desired ready/downloaded copies.
+
 Tasks, attempts, and reports:
 
 ```sh
@@ -308,7 +317,7 @@ Metrics:
 curl -fsS -H "Authorization: Bearer $ADMIN_TOKEN" "$BASE_URL/api/admin/metrics"
 ```
 
-Metrics include dashboard state WebSocket clients, connects, broadcasts, dropped updates, write failures, last snapshot bytes, and last broadcast subscribers.
+Metrics include dashboard state WebSocket clients, connects, broadcasts, dropped updates, write failures, last snapshot bytes, and last broadcast subscribers. Capacity gauges use bounded `model` and `profile` labels: `comrad_capacity_desired_cached`, `comrad_capacity_actual_cached`, `comrad_capacity_desired_warm`, `comrad_capacity_actual_warm`, `comrad_capacity_warming`, `comrad_capacity_failed`, and `comrad_capacity_blocked`.
 
 ## User API
 

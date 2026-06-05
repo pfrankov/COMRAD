@@ -32,13 +32,14 @@ Do not duplicate source-of-truth lists of hosts, services, models, roles, endpoi
 - Dashboard UI work must follow `DESIGN.md` while staying within the shadcn/Vite implementation. Map visual choices to the documented ink/canvas palette, Geist typography, hairline borders, restrained elevation, and form/table/card primitives; do not introduce a parallel theme or decorative system.
 - Workers connect outbound to the Manager over one WebSocket at `/api/worker/ws`; the Manager never opens inbound connections to Workers.
 - Workers must heartbeat over the Manager WebSocket; missed heartbeats make the Manager mark the Worker offline, mark idle slots unavailable, and replan capacity.
+- Workers that repeatedly disconnect, reconnect, or expire heartbeats inside the configured flap window must be temporarily suppressed for new warm placement and expose the reason plus expiration in admin state.
 - Workers download model/update artifacts only through authenticated Manager artifact URLs and only when assigned.
 - Workers evict cached model artifacts only when the Manager requests it; eviction is allowed only for artifacts that are no longer desired or active on that Worker.
 - Runtime executables such as `llama-server` are Worker-installed capabilities, not model artifacts. The macOS Worker bundle must include the pinned `llama-server` runtime by default; explicit archive overrides remain operator-controlled. Runtime processes stay local to the Worker and must not be exposed to the LAN.
 - Admin artifact deletion must be guarded: artifacts still referenced by profiles or updates are not deletable.
 - One slot runs at most one active task.
 - The Manager owns placement, task state, attempts, reports, queue state, and quarantine state.
-- Placement must account for aggregate Worker RAM and disk budgets across all desired model copies; auto-balanced policies may change effective desired counts only within configured per-model min/max limits.
+- Placement must account for aggregate Worker RAM and disk budgets across all desired model copies; auto-balanced policies may change effective desired counts only within configured per-model min/max limits, scale down only after the cooldown, and preserve active or warming runtime copies while draining excess idle copies.
 - The Manager owns users, API key hashes, compute pricing, balances, and the append-only compute ledger; the ledger is the source of truth for balances.
 - Workers report capabilities, cache, slot state, tokens, telemetry, and reports; Workers do not decide global placement.
 - Logical model names are client-facing; runtime variant ids, exact model artifact sets, context, runtime parameters, and runtime adapters are execution details that must be preserved in Manager state and reports.

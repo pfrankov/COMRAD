@@ -6,6 +6,14 @@ import (
 )
 
 func BuildCachePlans(db Database) []CachePlan {
+	return buildCachePlans(db, defaultAutoBalanceScaleDownCooldown)
+}
+
+func BuildCachePlansWithConfig(db Database, cfg ManagerConfig) []CachePlan {
+	return buildCachePlans(db, managerAutoBalanceCooldown(cfg))
+}
+
+func buildCachePlans(db Database, cooldown time.Duration) []CachePlan {
 	policies := SortedPolicies(db)
 	out := make([]CachePlan, 0, len(policies))
 	for _, policy := range policies {
@@ -13,16 +21,20 @@ func BuildCachePlans(db Database) []CachePlan {
 		if !ok {
 			continue
 		}
-		out = append(out, buildCachePlan(db, profile, policy))
+		out = append(out, buildCachePlanWithCooldown(db, profile, policy, cooldown))
 	}
 	return out
 }
 
 func buildCachePlan(db Database, profile WorkloadProfile, policy PlacementPolicy) CachePlan {
+	return buildCachePlanWithCooldown(db, profile, policy, defaultAutoBalanceScaleDownCooldown)
+}
+
+func buildCachePlanWithCooldown(db Database, profile WorkloadProfile, policy PlacementPolicy, cooldown time.Duration) CachePlan {
 	artifacts := profileArtifactIDs(profile)
 	desiredNodes := desiredCacheNodes(db, profile.ID)
 	workers := cacheWorkerStatuses(db, profile, artifacts, desiredNodes)
-	capacity := EffectivePolicyCapacity(db, policy, time.Now().UTC())
+	capacity := effectivePolicyCapacity(db, policy, time.Now().UTC(), cooldown)
 	plan := CachePlan{
 		ProfileRef:       profile.ID,
 		Artifacts:        artifacts,
@@ -86,6 +98,7 @@ func cacheWorkerStatusForNode(db Database, profile WorkloadProfile, artifacts []
 		Warm:     nodeWarmForProfile(db, node.ID, profile),
 		Active:   nodeActiveForProfile(db, node.ID, profile.ID),
 		Eviction: latestEvictionStatus(db, node.ID, artifacts),
+		Intent:   latestCacheIntentStatus(db, node.ID, artifacts),
 	}
 }
 
@@ -183,6 +196,19 @@ func latestEvictionStatus(db Database, nodeID string, artifacts []string) CacheE
 		Failure:   latest.Failure,
 		UpdatedAt: latest.UpdatedAt,
 	}
+}
+
+func latestCacheIntentStatus(db Database, nodeID string, artifacts []string) CacheIntentStatus {
+	var latest CacheIntentRecord
+	for _, record := range db.CacheIntents {
+		if record.NodeID == nodeID && artifactInSet(record.ArtifactID, artifacts) && record.UpdatedAt.After(latest.UpdatedAt) {
+			latest = record
+		}
+	}
+	if latest.ID == "" {
+		return CacheIntentStatus{}
+	}
+	return CacheIntentStatus{Action: latest.Action, UpdatedAt: latest.UpdatedAt}
 }
 
 func artifactInSet(artifactID string, artifacts []string) bool {

@@ -19,6 +19,11 @@ import (
 
 const maxRuntimeRestartAttempts = 3
 
+var (
+	startLlamaServerProcessFn = startLlamaServerProcess
+	waitForLlamaServerReadyFn = waitForLlamaServerReady
+)
+
 type runtimeStreamStats struct {
 	FirstTokenAt     *time.Time
 	PromptTokens     int
@@ -110,11 +115,11 @@ func (w *Worker) startLlamaServer(ctx context.Context, profile WorkloadProfile) 
 		if err != nil {
 			return nil, err
 		}
-		proc, err := startLlamaServerProcess(runtimePath, args, port, assignmentKey(profile))
+		proc, err := startLlamaServerProcessFn(runtimePath, args, port, assignmentKey(profile))
 		if err != nil {
 			return nil, err
 		}
-		if err := waitForLlamaServerReady(ctx, w.client, proc, w.cfg.RuntimeStartWait); err != nil {
+		if err := waitForLlamaServerReadyFn(ctx, w.client, proc, w.cfg.RuntimeStartWait); err != nil {
 			lastErr = err
 			stderr := proc.stderr.String()
 			proc.stop()
@@ -182,7 +187,7 @@ func waitForLlamaServerReady(ctx context.Context, client *http.Client, proc *lla
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		if llamaHealthOK(ctx, client, proc.baseURL) {
+		if llamaHealthProbeOK(ctx, client, proc.baseURL) {
 			return nil
 		}
 		select {
@@ -199,6 +204,12 @@ func waitForLlamaServerReady(ctx context.Context, client *http.Client, proc *lla
 		case <-ticker.C:
 		}
 	}
+}
+
+func llamaHealthProbeOK(ctx context.Context, client *http.Client, baseURL string) bool {
+	probeCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	return llamaHealthOK(probeCtx, client, baseURL)
 }
 
 func (p *llamaServerProcess) err() error {
@@ -238,19 +249,44 @@ func (p *llamaServerProcess) stop() {
 	if p == nil {
 		return
 	}
+	if p.cmd == nil {
+		p.closeDone()
+		return
+	}
+	p.interrupt()
+	if p.waitDone(time.Second) {
+		return
+	}
+	p.kill()
+	_ = p.waitDone(time.Second)
+}
+
+func (p *llamaServerProcess) closeDone() {
+	select {
+	case <-p.done:
+	default:
+		close(p.done)
+	}
+}
+
+func (p *llamaServerProcess) interrupt() {
 	if p.cmd.Process != nil {
 		_ = p.cmd.Process.Signal(os.Interrupt)
 	}
+}
+
+func (p *llamaServerProcess) kill() {
+	if p.cmd.Process != nil {
+		_ = p.cmd.Process.Kill()
+	}
+}
+
+func (p *llamaServerProcess) waitDone(timeout time.Duration) bool {
 	select {
 	case <-p.done:
-	case <-time.After(time.Second):
-		if p.cmd.Process != nil {
-			_ = p.cmd.Process.Kill()
-		}
-		select {
-		case <-p.done:
-		case <-time.After(time.Second):
-		}
+		return true
+	case <-time.After(timeout):
+		return false
 	}
 }
 

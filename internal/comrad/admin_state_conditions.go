@@ -164,6 +164,7 @@ func nodeConditions(node Node, slots []Slot) []Condition {
 		boolCondition("Approved", node.Approved, "WorkerApproved", "WorkerNotApproved", "Worker is approved.", "Worker is not approved.", at),
 		nodeCompatibleCondition(node, slots, at),
 		boolCondition("Quarantined", node.Quarantined, "WorkerQuarantined", "WorkerNotQuarantined", "Worker is quarantined.", "Worker is not quarantined.", at),
+		nodeWarmPlacementSuppressedCondition(node, at),
 	}
 }
 
@@ -185,6 +186,13 @@ func nodeConnectedCondition(node Node, at time.Time) Condition {
 func nodeCompatibleCondition(node Node, slots []Slot, at time.Time) Condition {
 	compatible := len(node.RuntimeAdapters) > 0 && len(slots) > 0
 	return boolCondition("Compatible", compatible, "RuntimeAdapterAvailable", "NoRuntimeAdapter", "Worker reports a runtime adapter and slots.", "Worker has no runtime adapter or slots.", at)
+}
+
+func nodeWarmPlacementSuppressedCondition(node Node, at time.Time) Condition {
+	if node.WarmPlacementSuppressed {
+		return newCondition("WarmPlacementSuppressed", "True", "WorkerFlapping", "Warm placement is temporarily suppressed because the Worker is flapping.", at)
+	}
+	return newCondition("WarmPlacementSuppressed", "False", "WorkerTrusted", "Worker is trusted for warm placement.", at)
 }
 
 func decorateSlotConditions(db *Database) {

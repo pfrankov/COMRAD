@@ -30,12 +30,16 @@ func validatePlacementPolicy(policy PlacementPolicy) error {
 }
 
 func EffectivePolicyCapacity(db Database, policy PlacementPolicy, now time.Time) policyCapacity {
+	return effectivePolicyCapacity(db, policy, now, defaultAutoBalanceScaleDownCooldown)
+}
+
+func effectivePolicyCapacity(db Database, policy PlacementPolicy, now time.Time, cooldown time.Duration) policyCapacity {
 	if !policy.AutoBalance {
 		warm := max(0, policy.WarmCount)
 		cached := max(warm, policy.CachedCount)
 		return policyCapacity{Cached: cached, Warm: warm, MinCached: cached, MinWarm: warm}
 	}
-	queued, running, recent := profileDemand(db, policy.ProfileID, now)
+	queued, running, recent, smoothed := profileDemand(db, policy.ProfileID, now)
 	minWarm := policy.MinWarmCount
 	if minWarm == 0 && policy.WarmCount > 0 {
 		minWarm = policy.WarmCount
@@ -44,23 +48,26 @@ func EffectivePolicyCapacity(db Database, policy PlacementPolicy, now time.Time)
 	if minCached == 0 && policy.CachedCount > 0 {
 		minCached = policy.CachedCount
 	}
-	warm := clampCount(queued+running+ceilDiv(recent, 4), minWarm, policy.MaxWarmCount)
+	demand := queued + running + smoothed
+	demand = max(demand, autoBalanceCooldownDemand(db, policy.ProfileID, now, cooldown))
+	warm := clampCount(demand, minWarm, policy.MaxWarmCount)
 	cached := clampCount(max(warm, minCached), minCached, policy.MaxCachedCount)
 	cached = max(cached, warm)
 	return policyCapacity{
-		Cached:        cached,
-		Warm:          warm,
-		MinCached:     minCached,
-		MinWarm:       minWarm,
-		DemandQueued:  queued,
-		DemandRunning: running,
-		DemandRecent:  recent,
+		Cached:         cached,
+		Warm:           warm,
+		MinCached:      minCached,
+		MinWarm:        minWarm,
+		DemandQueued:   queued,
+		DemandRunning:  running,
+		DemandRecent:   recent,
+		DemandSmoothed: smoothed,
 	}
 }
 
-func profileDemand(db Database, profileID string, now time.Time) (int, int, int) {
+func profileDemand(db Database, profileID string, now time.Time) (int, int, int, int) {
 	queued, running, recent := 0, 0, 0
-	cutoff := now.Add(-autoBalanceDemandWindow)
+	buckets := [autoBalanceDemandBuckets]int{}
 	for _, task := range db.Tasks {
 		if task.ProfileID != profileID {
 			continue
@@ -71,23 +78,59 @@ func profileDemand(db Database, profileID string, now time.Time) (int, int, int)
 		if task.Status == TaskStatusRunning {
 			running++
 		}
-		if task.CreatedAt.After(cutoff) {
+		if bucket, ok := demandBucket(task.CreatedAt, now); ok {
 			recent++
+			buckets[bucket]++
 		}
 	}
-	return queued, running, recent
+	return queued, running, recent, smoothedDemand(recent, buckets[:])
 }
 
 func decoratePolicyEffectiveCapacity(db *Database, now time.Time) {
+	decoratePolicyEffectiveCapacityWithCooldown(db, now, defaultAutoBalanceScaleDownCooldown)
+}
+
+func decoratePolicyEffectiveCapacityWithCooldown(db *Database, now time.Time, cooldown time.Duration) {
 	for id, policy := range db.Policies {
-		capacity := EffectivePolicyCapacity(*db, policy, now)
+		capacity := effectivePolicyCapacity(*db, policy, now, cooldown)
 		policy.EffectiveCachedCount = capacity.Cached
 		policy.EffectiveWarmCount = capacity.Warm
 		policy.DemandQueued = capacity.DemandQueued
 		policy.DemandRunning = capacity.DemandRunning
 		policy.DemandRecent = capacity.DemandRecent
+		policy.DemandSmoothed = capacity.DemandSmoothed
 		db.Policies[id] = policy
 	}
+}
+
+func demandBucket(createdAt, now time.Time) (int, bool) {
+	if createdAt.IsZero() || createdAt.After(now) {
+		return 0, false
+	}
+	age := now.Sub(createdAt)
+	if age >= autoBalanceDemandWindow {
+		return 0, false
+	}
+	bucketSize := autoBalanceDemandWindow / autoBalanceDemandBuckets
+	bucket := int(age / bucketSize)
+	if bucket >= autoBalanceDemandBuckets {
+		return 0, false
+	}
+	return bucket, true
+}
+
+func smoothedDemand(recent int, buckets []int) int {
+	if recent == 0 {
+		return 0
+	}
+	activeBuckets := 0
+	for _, count := range buckets {
+		if count > 0 {
+			activeBuckets++
+		}
+	}
+	activeBuckets = max(1, activeBuckets)
+	return ceilDiv(recent*activeBuckets, 4*autoBalanceDemandBuckets)
 }
 
 func desiredCachedCount(policy PlacementPolicy) int {

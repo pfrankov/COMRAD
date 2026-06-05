@@ -18,38 +18,42 @@ import (
 )
 
 type WorkerConfig struct {
-	ManagerURL       string
-	Token            string
-	NodeID           string
-	Name             string
-	StatePath        string
-	CacheDir         string
-	LlamaServerPath  string
-	RuntimeStartWait time.Duration
-	SlotCount        int
-	RAMBytes         int64
-	VRAMBytes        int64
-	UnifiedBytes     int64
-	DiskBytes        int64
-	EnableSelfUpdate bool
+	ManagerURL             string
+	Token                  string
+	NodeID                 string
+	Name                   string
+	StatePath              string
+	CacheDir               string
+	LlamaServerPath        string
+	RuntimeStartWait       time.Duration
+	SlotCount              int
+	MaxConcurrentDownloads int
+	RAMBytes               int64
+	VRAMBytes              int64
+	UnifiedBytes           int64
+	DiskBytes              int64
+	EnableSelfUpdate       bool
 }
 
 type Worker struct {
-	cfg             WorkerConfig
-	client          *http.Client
-	node            Node
-	nodeToken       string
-	slots           map[string]Slot
-	assigns         map[string]AssignmentPayload
-	cache           map[string]string
-	warm            map[string]WorkloadProfile
-	processed       map[string]time.Time
-	active          map[string]context.CancelFunc
-	runtimes        map[string]*llamaServerProcess
-	runtimeRestarts map[string]int
-	conn            *websocket.Conn
-	send            chan Envelope
-	mu              sync.Mutex
+	cfg               WorkerConfig
+	client            *http.Client
+	node              Node
+	nodeToken         string
+	slots             map[string]Slot
+	assigns           map[string]AssignmentPayload
+	cache             map[string]string
+	warm              map[string]WorkloadProfile
+	activeAssignments map[string]bool
+	processed         map[string]time.Time
+	active            map[string]context.CancelFunc
+	runtimes          map[string]*llamaServerProcess
+	runtimeRestarts   map[string]int
+	downloadTokens    chan struct{}
+	downloadPressure  DownloadPressure
+	conn              *websocket.Conn
+	send              chan Envelope
+	mu                sync.Mutex
 }
 
 type workerStateFile struct {
@@ -72,19 +76,22 @@ func NewWorker(cfg WorkerConfig) (*Worker, error) {
 	target, adapters := workerRuntimeTarget(cfg)
 	node := newWorkerNode(cfg, target, adapters)
 	w := &Worker{
-		cfg:             cfg,
-		client:          &http.Client{Timeout: 0},
-		node:            node,
-		nodeToken:       state.NodeToken,
-		slots:           newWorkerSlots(cfg, target, adapters),
-		assigns:         map[string]AssignmentPayload{},
-		cache:           state.Cache,
-		warm:            map[string]WorkloadProfile{},
-		processed:       map[string]time.Time{},
-		active:          map[string]context.CancelFunc{},
-		runtimes:        map[string]*llamaServerProcess{},
-		runtimeRestarts: map[string]int{},
-		send:            make(chan Envelope, 256),
+		cfg:               cfg,
+		client:            &http.Client{Timeout: 0},
+		node:              node,
+		nodeToken:         state.NodeToken,
+		slots:             newWorkerSlots(cfg, target, adapters),
+		assigns:           map[string]AssignmentPayload{},
+		cache:             state.Cache,
+		warm:              map[string]WorkloadProfile{},
+		activeAssignments: map[string]bool{},
+		processed:         map[string]time.Time{},
+		active:            map[string]context.CancelFunc{},
+		runtimes:          map[string]*llamaServerProcess{},
+		runtimeRestarts:   map[string]int{},
+		downloadTokens:    make(chan struct{}, cfg.MaxConcurrentDownloads),
+		downloadPressure:  DownloadPressure{MaxConcurrent: cfg.MaxConcurrentDownloads},
+		send:              make(chan Envelope, 256),
 	}
 	if w.cache == nil {
 		w.cache = map[string]string{}
@@ -110,6 +117,9 @@ func applyWorkerDefaults(cfg *WorkerConfig) {
 	}
 	if cfg.SlotCount <= 0 {
 		cfg.SlotCount = 1
+	}
+	if cfg.MaxConcurrentDownloads <= 0 {
+		cfg.MaxConcurrentDownloads = 1
 	}
 	if cfg.RAMBytes <= 0 {
 		cfg.RAMBytes = 8 << 30
@@ -155,7 +165,7 @@ func workerRuntimeTarget(cfg WorkerConfig) (string, []string) {
 }
 
 func newWorkerNode(cfg WorkerConfig, target string, adapters []string) Node {
-	return Node{ID: cfg.NodeID, Name: workerNodeName(cfg), OS: runtime.GOOS, Arch: runtime.GOARCH, Target: target, Mode: "reserved_always", Tags: []string{"local", runtime.GOOS, runtime.GOARCH}, State: NodeStateRegistered, Version: Version, RuntimeAdapters: adapters, Budgets: workerBudget(cfg, cfg.SlotCount), Approved: true}
+	return Node{ID: cfg.NodeID, Name: workerNodeName(cfg), OS: runtime.GOOS, Arch: runtime.GOARCH, Target: target, Mode: "reserved_always", Tags: []string{"local", runtime.GOOS, runtime.GOARCH}, State: NodeStateRegistered, Version: Version, RuntimeAdapters: adapters, Budgets: workerBudget(cfg, cfg.SlotCount), DownloadPressure: DownloadPressure{MaxConcurrent: cfg.MaxConcurrentDownloads}, Approved: true}
 }
 
 func workerNodeName(cfg WorkerConfig) string {

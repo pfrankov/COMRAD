@@ -11,12 +11,34 @@ import (
 )
 
 func (w *Worker) ensureArtifact(ctx context.Context, artifact ArtifactSpec) error {
+	return w.ensureArtifactWithStart(ctx, artifact, nil)
+}
+
+func (w *Worker) ensureArtifactWithStart(ctx context.Context, artifact ArtifactSpec, onStart func()) error {
 	if artifact.ID == "" || artifact.URL == "" {
 		return errors.New("artifact spec missing id or url")
 	}
 	if w.artifactAlreadyCached(artifact) {
 		return nil
 	}
+	w.sendArtifactState(artifact, "download_queued", "")
+	release, err := w.acquireDownloadSlot(ctx)
+	if err != nil {
+		w.sendArtifactState(artifact, "download_failed", err.Error())
+		return err
+	}
+	defer release()
+	if w.artifactAlreadyCached(artifact) {
+		return nil
+	}
+	w.sendArtifactState(artifact, "downloading", "")
+	if onStart != nil {
+		onStart()
+	}
+	return w.downloadArtifact(ctx, artifact)
+}
+
+func (w *Worker) downloadArtifact(ctx context.Context, artifact ArtifactSpec) error {
 	target := filepath.Join(w.cfg.CacheDir, safeArtifactFileName(artifact.ID))
 	resp, err := w.openArtifactResponse(ctx, artifact)
 	if err != nil {

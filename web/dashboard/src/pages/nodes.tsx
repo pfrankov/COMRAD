@@ -1,11 +1,6 @@
 import { useState } from "react"
 
-import {
-  ActivityIcon,
-  HardDriveIcon,
-  MemoryStickIcon,
-  Trash2Icon,
-} from "lucide-react"
+import { ActivityIcon, HardDriveIcon, MemoryStickIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -31,7 +26,7 @@ import { fmtBytes, human, short, timeAgo } from "@/lib/comrad"
 import {
   drainNode,
   enableNode,
-  evictWorkerArtifact,
+  setCacheArtifactAction,
   unbanNode,
   unbanSlot,
   type Actions,
@@ -135,6 +130,13 @@ function NodeCard({
             <CardDescription>
               {node.os || "-"} / {node.arch || "-"} / {node.target || "-"}
             </CardDescription>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {t(
+                "nodes.lastSeenInline",
+                { lastSeen: timeAgo(node.lastSeen, t) },
+                `Last seen ${timeAgo(node.lastSeen, t)}`
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <StatusBadge
@@ -155,7 +157,7 @@ function NodeCard({
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{reason}</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <ResourceStat
             icon={ActivityIcon}
             label={t("nodes.metric.readySlots", undefined, "Ready slots")}
@@ -172,14 +174,33 @@ function NodeCard({
           />
           <ResourceStat
             icon={HardDriveIcon}
-            label={t(
-              "nodes.metric.diskRemaining",
-              undefined,
-              "Disk remaining"
-            )}
+            label={t("nodes.metric.diskRemaining", undefined, "Disk remaining")}
             value={fmtBytes(resources.diskRemaining)}
           />
+          <ResourceStat
+            icon={ActivityIcon}
+            label={t(
+              "nodes.metric.downloadPressure",
+              undefined,
+              "Download pressure"
+            )}
+            value={formatDownloadPressure(node, t)}
+          />
         </div>
+        {node.warmPlacementSuppressed ? (
+          <div className="rounded-lg border bg-muted/50 p-3">
+            <div className="text-sm font-medium">
+              {t(
+                "nodes.warmPlacementSuppressed.title",
+                undefined,
+                "Warm placement suppressed"
+              )}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {warmSuppressionText(node, t)}
+            </p>
+          </div>
+        ) : null}
         <Separator />
         <SlotList slots={slots} actions={actions} t={t} />
         <div className="flex flex-wrap gap-2">
@@ -271,6 +292,28 @@ function NodeTechnicalDetailsDialog({
               timeAgo(node.lastSeen, t),
             ],
             [
+              t("nodes.field.downloadPressure", undefined, "Download pressure"),
+              formatDownloadPressure(node, t),
+            ],
+            [
+              t(
+                "nodes.field.warmPlacementSuppression",
+                undefined,
+                "Warm placement suppression"
+              ),
+              node.warmPlacementSuppressed
+                ? human(node.warmPlacementSuppressionReason, t)
+                : "-",
+            ],
+            [
+              t(
+                "nodes.field.warmPlacementSuppressionUntil",
+                undefined,
+                "Warm placement suppression until"
+              ),
+              node.warmPlacementSuppressionUntil || "-",
+            ],
+            [
               t("nodes.field.lastFailure", undefined, "Last failure"),
               node.lastFailure || "-",
             ],
@@ -355,30 +398,72 @@ function CachedArtifactList({
               <code className="block truncate">{short(artifactId)}</code>
               <ArtifactEvictionInline record={latestEviction} t={t} />
             </div>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={!canEvict}
-              title={
-                canEvict
-                  ? t(
-                      "nodes.action.evictArtifact",
-                      undefined,
-                      "Remove from worker"
-                    )
-                  : t(
-                      "nodes.cache.workerOffline",
-                      undefined,
-                      "Worker must be online to remove cached files"
-                    )
-              }
-              onClick={() =>
-                evictWorkerArtifact(node.nodeId, artifactId, actions)
-              }
-            >
-              <Trash2Icon data-icon="inline-start" />
-              {t("nodes.action.evictArtifact", undefined, "Remove from worker")}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setCacheArtifactAction(
+                    node.nodeId,
+                    [artifactId],
+                    "keep",
+                    actions
+                  )
+                }
+              >
+                {t("nodes.action.cacheKeep", undefined, "Keep")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setCacheArtifactAction(
+                    node.nodeId,
+                    [artifactId],
+                    "evict_when_idle",
+                    actions
+                  )
+                }
+              >
+                {t(
+                  "nodes.action.cacheEvictWhenIdle",
+                  undefined,
+                  "Evict when idle"
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={!canEvict}
+                title={
+                  canEvict
+                    ? t(
+                        "nodes.action.evictArtifact",
+                        undefined,
+                        "Remove from worker"
+                      )
+                    : t(
+                        "nodes.cache.workerOffline",
+                        undefined,
+                        "Worker must be online to remove cached files"
+                      )
+                }
+                onClick={() =>
+                  setCacheArtifactAction(
+                    node.nodeId,
+                    [artifactId],
+                    "evict",
+                    actions
+                  )
+                }
+              >
+                {t(
+                  "nodes.action.evictArtifact",
+                  undefined,
+                  "Remove from worker"
+                )}
+              </Button>
+            </div>
           </div>
         )
       })}
@@ -471,7 +556,10 @@ type NodeResourcePlan = {
   diskRemaining?: number
 }
 
-function plannedNodeResources(node: Node, state: StateResponse): NodeResourcePlan {
+function plannedNodeResources(
+  node: Node,
+  state: StateResponse
+): NodeResourcePlan {
   const profiles = state.profiles ?? []
   const assignments = (state.assignments ?? []).filter(
     (assignment) => assignment.nodeId === node.nodeId
@@ -479,7 +567,8 @@ function plannedNodeResources(node: Node, state: StateResponse): NodeResourcePla
   const memoryUsed = assignments
     .filter((assignment) => assignment.desiredWarm)
     .reduce(
-      (total, assignment) => total + profileMemory(profileFor(assignment, profiles)),
+      (total, assignment) =>
+        total + profileMemory(profileFor(assignment, profiles)),
       0
     )
   const cachedProfiles = new Set(
@@ -488,7 +577,8 @@ function plannedNodeResources(node: Node, state: StateResponse): NodeResourcePla
       .map((assignment) => assignment.profileId)
   )
   const diskUsed = [...cachedProfiles].reduce(
-    (total, profileId) => total + profileDisk(profileForId(profileId, profiles)),
+    (total, profileId) =>
+      total + profileDisk(profileForId(profileId, profiles)),
     0
   )
   return {
@@ -523,6 +613,29 @@ function profileDisk(profile?: Profile) {
 function remainingBytes(total?: number, used = 0) {
   if (!total) return undefined
   return Math.max(0, total - used)
+}
+
+function formatDownloadPressure(node: Node, t: TFunction) {
+  const pressure = node.downloadPressure
+  if (!pressure) return "-"
+  const active = pressure.active ?? 0
+  const queued = pressure.queued ?? 0
+  const max = pressure.maxConcurrent ?? 0
+  return t(
+    "nodes.metric.downloadPressure.value",
+    { active, max, queued },
+    `${active}/${max} active, ${queued} queued`
+  )
+}
+
+function warmSuppressionText(node: Node, t: TFunction) {
+  const reason = human(node.warmPlacementSuppressionReason, t)
+  const until = timeAgo(node.warmPlacementSuppressionUntil, t)
+  return t(
+    "nodes.reason.warmPlacementSuppressed",
+    { reason, until },
+    `New warm placement is temporarily blocked because ${reason}. Expires ${until}.`
+  )
 }
 
 function ResourceStat({

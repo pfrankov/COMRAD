@@ -239,6 +239,10 @@ func (s *workerSession) enqueue(msg Envelope) bool {
 }
 
 func (s *workerSession) close() {
+	s.closeWithFlapEvent(workerFlapEventDisconnect)
+}
+
+func (s *workerSession) closeWithFlapEvent(eventType string) {
 	s.once.Do(func() {
 		close(s.done)
 		if s.conn != nil {
@@ -246,7 +250,7 @@ func (s *workerSession) close() {
 		}
 		if s.nodeID != "" {
 			s.manager.removeSession(s)
-			s.manager.publishWorkerDisconnectFailures(s.failRunningAttempts())
+			s.manager.publishWorkerDisconnectFailures(s.failRunningAttempts(eventType))
 		}
 	})
 }
@@ -259,14 +263,15 @@ func (m *Manager) removeSession(s *workerSession) {
 	m.mu.Unlock()
 }
 
-func (s *workerSession) failRunningAttempts() []AttemptFailedPayload {
+func (s *workerSession) failRunningAttempts(eventType string) []AttemptFailedPayload {
 	var failed []AttemptFailedPayload
 	_ = s.manager.store.Update(func(db *Database) error {
 		node := db.Nodes[s.nodeID]
+		now := time.Now().UTC()
 		if node.ConnectedSession == s.id || node.ConnectedSession == "" {
+			node = recordWorkerFlapEvent(node, eventType, now, s.manager.cfg)
 			markDisconnectedNode(db, node)
 		}
-		now := time.Now().UTC()
 		for id, attempt := range db.Attempts {
 			if attempt.NodeID != s.nodeID || attempt.Status != TaskStatusRunning {
 				continue

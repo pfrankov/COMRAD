@@ -27,10 +27,10 @@ func (m *Manager) expireWorkerHeartbeats(now time.Time) {
 	cutoff := now.Add(-timeout)
 	sessions, offline := m.staleWorkerSessions(cutoff)
 	for _, session := range sessions {
-		session.close()
+		session.closeWithFlapEvent(workerFlapEventHeartbeatExpired)
 	}
 	if len(offline) > 0 {
-		m.markOfflineWorkers(offline)
+		m.markOfflineWorkers(offline, workerFlapEventHeartbeatExpired, now)
 	}
 	if len(sessions) > 0 || len(offline) > 0 {
 		m.replanAndDispatch()
@@ -57,11 +57,12 @@ func (m *Manager) staleWorkerSessions(cutoff time.Time) ([]*workerSession, []str
 	return sessions, offline
 }
 
-func (m *Manager) markOfflineWorkers(nodeIDs []string) {
+func (m *Manager) markOfflineWorkers(nodeIDs []string, eventType string, now time.Time) {
 	_ = m.store.Update(func(db *Database) error {
 		for _, nodeID := range nodeIDs {
 			node := db.Nodes[nodeID]
 			if node.ID != "" {
+				node = recordWorkerFlapEvent(node, eventType, now, m.cfg)
 				markDisconnectedNode(db, node)
 			}
 		}

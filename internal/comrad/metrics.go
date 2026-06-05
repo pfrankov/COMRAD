@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"time"
 )
 
 type RuntimeMetrics struct {
@@ -54,7 +55,102 @@ func writePrometheusMetrics(w io.Writer, db Database, queueInUse, queueLimit int
 	fmt.Fprintln(w, "# HELP comrad_artifacts_total Artifacts stored by the Manager.")
 	fmt.Fprintln(w, "# TYPE comrad_artifacts_total gauge")
 	fmt.Fprintf(w, "comrad_artifacts_total %d\n", len(db.Artifacts))
+	writeCapacityMetrics(w, db)
 	writeRuntimeMetrics(w, runtime)
+}
+
+type capacityMetricState struct {
+	ProfileID     string
+	LogicalModel  string
+	DesiredCached int
+	ActualCached  int
+	DesiredWarm   int
+	ActualWarm    int
+	Warming       int
+	Failed        int
+	Blocked       int
+}
+
+func writeCapacityMetrics(w io.Writer, db Database) {
+	states := capacityMetricStates(db)
+	writeCapacityMetric(w, "comrad_capacity_desired_cached", "Desired cached copies by logical model and profile.", states, func(s capacityMetricState) int { return s.DesiredCached })
+	writeCapacityMetric(w, "comrad_capacity_actual_cached", "Actual cached copies by logical model and profile.", states, func(s capacityMetricState) int { return s.ActualCached })
+	writeCapacityMetric(w, "comrad_capacity_desired_warm", "Desired warm copies by logical model and profile.", states, func(s capacityMetricState) int { return s.DesiredWarm })
+	writeCapacityMetric(w, "comrad_capacity_actual_warm", "Actual warm copies by logical model and profile.", states, func(s capacityMetricState) int { return s.ActualWarm })
+	writeCapacityMetric(w, "comrad_capacity_warming", "Desired warm copies currently downloading, loading, or warming.", states, func(s capacityMetricState) int { return s.Warming })
+	writeCapacityMetric(w, "comrad_capacity_failed", "Desired capacity copies currently failed.", states, func(s capacityMetricState) int { return s.Failed })
+	writeCapacityMetric(w, "comrad_capacity_blocked", "Desired capacity copies blocked by placement.", states, func(s capacityMetricState) int { return s.Blocked })
+}
+
+func writeCapacityMetric(w io.Writer, metric, help string, states []capacityMetricState, value func(capacityMetricState) int) {
+	fmt.Fprintf(w, "# HELP %s %s\n", metric, help)
+	fmt.Fprintf(w, "# TYPE %s gauge\n", metric)
+	for _, state := range states {
+		fmt.Fprintf(w, "%s{model=%q,profile=%q} %d\n", metric, state.LogicalModel, state.ProfileID, value(state))
+	}
+}
+
+func capacityMetricStates(db Database) []capacityMetricState {
+	plans := cachePlansByProfile(BuildCachePlans(db))
+	now := time.Now().UTC()
+	out := []capacityMetricState{}
+	for _, policy := range SortedPolicies(db) {
+		profile, ok := db.Profiles[policy.ProfileID]
+		if !ok {
+			continue
+		}
+		capacity := EffectivePolicyCapacity(db, policy, now)
+		plan := plans[profile.ID]
+		warming, failed, blocked := capacityProgressCounts(db, profile.ID)
+		out = append(out, capacityMetricState{
+			ProfileID:     profile.ID,
+			LogicalModel:  ProfileLogicalModel(profile),
+			DesiredCached: capacity.Cached,
+			ActualCached:  plan.ActualCopies,
+			DesiredWarm:   capacity.Warm,
+			ActualWarm:    actualWarmCopies(plan),
+			Warming:       warming,
+			Failed:        failed,
+			Blocked:       blocked,
+		})
+	}
+	return out
+}
+
+func capacityProgressCounts(db Database, profileID string) (int, int, int) {
+	warming, failed, blocked := 0, 0, 0
+	desiredWarmSlots := desiredWarmSlotIDs(db, profileID)
+	for _, slot := range db.Slots {
+		if !desiredWarmSlots[slot.ID] || slot.ProfileID != profileID {
+			continue
+		}
+		switch slot.State {
+		case SlotStateDownloading, SlotStateCached, SlotStateLoading, SlotStateWarming:
+			warming++
+		case SlotStateError:
+			failed++
+		}
+	}
+	for _, assignment := range db.Assignments {
+		if assignment.ProfileID != profileID || !assignment.DesiredCached || assignment.MismatchReason == "" {
+			continue
+		}
+		if slot, ok := db.Slots[assignment.SlotID]; ok && slot.State == SlotStateError {
+			continue
+		}
+		blocked++
+	}
+	return warming, failed, blocked
+}
+
+func desiredWarmSlotIDs(db Database, profileID string) map[string]bool {
+	out := map[string]bool{}
+	for _, assignment := range db.Assignments {
+		if assignment.ProfileID == profileID && assignment.DesiredWarm && assignment.SlotID != "" {
+			out[assignment.SlotID] = true
+		}
+	}
+	return out
 }
 
 func writeRuntimeMetrics(w io.Writer, runtime RuntimeMetrics) {

@@ -14,6 +14,7 @@ func cloneDatabase(db Database) Database {
 		Slots:             cloneMapValues(db.Slots, cloneSlot),
 		Artifacts:         maps.Clone(db.Artifacts),
 		ArtifactEvictions: cloneMapValues(db.ArtifactEvictions, cloneArtifactEvictionRecord),
+		CacheIntents:      maps.Clone(db.CacheIntents),
 		Profiles:          cloneMapValues(db.Profiles, cloneWorkloadProfile),
 		Policies:          cloneMapValues(db.Policies, clonePlacementPolicy),
 		Assignments:       maps.Clone(db.Assignments),
@@ -48,6 +49,8 @@ func cloneNode(in Node) Node {
 	out.WarmProfiles = slices.Clone(in.WarmProfiles)
 	out.LastFailureAt = cloneTimePtr(in.LastFailureAt)
 	out.QuarantineUntil = cloneTimePtr(in.QuarantineUntil)
+	out.RecentFlapEvents = slices.Clone(in.RecentFlapEvents)
+	out.WarmPlacementSuppressionUntil = cloneTimePtr(in.WarmPlacementSuppressionUntil)
 	out.Conditions = cloneConditions(in.Conditions)
 	out.ConnectedSession = ""
 	return out

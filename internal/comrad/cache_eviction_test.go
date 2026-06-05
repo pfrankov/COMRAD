@@ -118,6 +118,60 @@ func TestAdminCanEvictStaleArtifactFromSelectedWorker(t *testing.T) {
 	}
 }
 
+func TestAdminCanRequestStaleIdleCacheEviction(t *testing.T) {
+	m := newTestManager(t, 4, time.Second, 3)
+	profile := seedBasicProfile(t, m)
+	session := addReadySession(t, m, "node-a", "node-a/slot0", profile)
+	seedStaleCachedArtifact(t, m, "node-a", "node-a/slot0", SlotStateIdle)
+	server := httptest.NewServer(m.Handler())
+	defer server.Close()
+
+	resp := postCacheArtifactAction(t, server.URL, "node-a", "sha256:model", "evict")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("evict action status = %d", resp.StatusCode)
+	}
+	payload := decodeEvictPayload(t, nextEvict(t, session))
+	if payload.ArtifactID != "sha256:model" || payload.Reason != "admin_requested" {
+		t.Fatalf("evict payload = %+v", payload)
+	}
+}
+
+func TestAdminCannotEvictActiveStaleCache(t *testing.T) {
+	m := newTestManager(t, 4, time.Second, 3)
+	profile := seedBasicProfile(t, m)
+	session := addReadySession(t, m, "node-a", "node-a/slot0", profile)
+	seedStaleCachedArtifact(t, m, "node-a", "node-a/slot0", SlotStateServing)
+	server := httptest.NewServer(m.Handler())
+	defer server.Close()
+
+	resp := postCacheArtifactAction(t, server.URL, "node-a", "sha256:model", "evict")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("active evict status = %d", resp.StatusCode)
+	}
+	assertNoEvictQueued(t, session)
+}
+
+func TestKeptStaleCacheIsNotIncludedInEvictionPlan(t *testing.T) {
+	m := newTestManager(t, 4, time.Second, 3)
+	profile := seedBasicProfile(t, m)
+	addReadySession(t, m, "node-a", "node-a/slot0", profile)
+	seedStaleCachedArtifact(t, m, "node-a", "node-a/slot0", SlotStateIdle)
+	server := httptest.NewServer(m.Handler())
+	defer server.Close()
+
+	resp := postCacheArtifactAction(t, server.URL, "node-a", "sha256:model", "keep")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("keep action status = %d", resp.StatusCode)
+	}
+	targets := staleArtifactEvictions(m.store.Snapshot())
+	if len(targets) != 0 {
+		t.Fatalf("kept stale artifact was planned for eviction: %+v", targets)
+	}
+}
+
 func TestArtifactEvictionStateTracksQueuedBlockedAndWorkerResult(t *testing.T) {
 	m := newTestManager(t, 4, time.Second, 3)
 	profile := seedBasicProfile(t, m)
@@ -249,6 +303,57 @@ func decodeEvictPayload(t *testing.T, msg Envelope) EvictArtifactPayload {
 		t.Fatal(err)
 	}
 	return payload
+}
+
+func postCacheArtifactAction(t *testing.T, serverURL, nodeID, artifactID, action string) *http.Response {
+	t.Helper()
+	body := strings.NewReader(`{"action":"` + action + `"}`)
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/admin/nodes/"+nodeID+"/artifacts/"+artifactID, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer admin")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
+func seedStaleCachedArtifact(t *testing.T, m *Manager, nodeID, slotID, state string) {
+	t.Helper()
+	if err := m.store.Update(func(db *Database) error {
+		node := db.Nodes[nodeID]
+		node.CachedArtifacts = []string{"sha256:model"}
+		db.Nodes[nodeID] = node
+		slot := db.Slots[slotID]
+		slot.State = state
+		slot.ProfileID = "llm.chat/assistant"
+		slot.ModelArtifactID = "sha256:model"
+		slot.ModelSHA256 = "sha256:model"
+		slot.ActiveTaskID = ""
+		slot.AcceptsNew = state == SlotStateReady
+		if state == SlotStateServing {
+			slot.ActiveTaskID = "task-active"
+			slot.AcceptsNew = false
+		}
+		db.Slots[slot.ID] = slot
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertNoEvictQueued(t *testing.T, session *workerSession) {
+	t.Helper()
+	select {
+	case msg := <-session.send:
+		if msg.Type == MsgEvictArtifact {
+			t.Fatalf("unexpected eviction queued: %+v", msg)
+		}
+	default:
+	}
 }
 
 func drainSessionMessages(session *workerSession) {

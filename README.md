@@ -89,6 +89,8 @@ curl -fsS http://<manager-host>:1922/ready
 | PostgreSQL or SQLite | Manager side | Durable Manager state |
 | Prometheus | Optional Compose service | Metrics storage for `/metrics` |
 
+`/metrics` includes bounded per-model/profile capacity gauges for desired vs actual cached and warm copies, warming copies, failed copies, and blocked placement.
+
 The first supported Worker path is macOS Apple Silicon with bundled `llama.cpp`. The Manager can run from Docker Compose or from built binaries.
 
 ## Quick Start
@@ -142,12 +144,14 @@ Install a macOS Worker from the bundle:
 cd dist/bundle-darwin-arm64
 COMRAD_MANAGER_URL='http://<manager-host>:1922' \
 COMRAD_WORKER_TOKEN='<worker-token>' \
+COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS=1 \
 COMRAD_WORKER_UNIFIED_BYTES=17179869184 \
 COMRAD_WORKER_DISK_BYTES=21474836480 \
 scripts/install-worker-macos.sh
 ```
 
 Use `COMRAD_MANAGER_URL=http://127.0.0.1:1922` when the Manager and Worker run on the same Mac.
+Workers default to one concurrent model artifact download so multiple queued cached or warm assignments do not saturate one node.
 
 ## Add The First Model
 
@@ -163,7 +167,7 @@ The dashboard path is the shortest path for normal use:
 
 COMRAD separates the client model name from the concrete files Workers execute. A profile can point at one or more model artifacts, and Workers refresh ready slots when that profile changes.
 
-Deleting a model from **Models** removes its profile and capacity policy, then asks online Workers to evict cached files that are no longer desired or active. The **Nodes** technical details dialog also lets an admin remove a stale cached artifact from one selected Worker.
+Deleting a model from **Models** removes its profile and capacity policy, then asks online Workers to evict cached files that are no longer desired, warming, or active. Admin APIs can also keep a stale cached artifact, evict it now, or mark it for eviction when it becomes idle on one selected Worker.
 
 More detail: [docs/model-management.md](docs/model-management.md).
 
@@ -185,8 +189,8 @@ Most day-to-day work happens in the dashboard:
 
 - **Overview**: readiness, blockers, queue pressure, and triage.
 - **Models**: upload files, create, edit, and delete profiles, adjust runtime settings, and inspect linked artifacts.
-- **Capacity**: choose downloaded and ready copies per model.
-- **Nodes**: inspect Workers, slots, resources, readiness reasons, and remove stale cached artifacts from a selected Worker.
+- **Capacity**: choose downloaded and ready copies per model, including auto-balance min/max limits.
+- **Nodes**: inspect Workers, slots, resources, readiness reasons, warm-placement suppression, and remove stale cached artifacts from a selected Worker.
 - **API clients**: manage clients, keys, balances, owned nodes, and ledgers.
 - **Tasks**: review request history, retries, and timelines without showing prompts by default.
 - **Storage**: inspect artifact hashes and delete unused files safely.

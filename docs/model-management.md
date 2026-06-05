@@ -57,9 +57,9 @@ Deletion is blocked while an artifact is referenced by a profile or update. Uplo
 
 ## Worker Cache Cleanup
 
-Model deletion and capacity changes clean Worker caches automatically. When a profile is deleted, or when a policy lowers downloaded/ready copies so an artifact is no longer desired on a Worker, the Manager sends an eviction command to that Worker. The Worker stops affected warm runtimes, clears stale slot state, deletes the cached file, and reports `evicted`. It refuses eviction when the artifact is serving active work.
+Model deletion and capacity changes clean Worker caches automatically. When a profile is deleted, or when a policy lowers downloaded/ready copies so an artifact is no longer desired on a Worker, the Manager sends an eviction command to that Worker. The Manager does not evict artifacts that are still assigned, warming, or serving active work. The Worker stops affected warm runtimes, clears stale slot state, deletes the cached file, and reports `evicted`.
 
-The Admin state includes a `cachePlans` view for each capacity policy. It reports the profile, required artifacts, required tags, desired cached copies, actual cached copies, stale copies, pending evictions, and per-Worker cached/warm/active/eviction state. The dashboard shows this under **Capacity** so operators can answer where a model is cached and why stale files have not been removed yet.
+The Admin state includes a `cachePlans` view for each capacity policy. It reports the profile, required artifacts, required tags, desired cached copies, actual cached copies, stale copies, pending evictions, and per-Worker cached/warm/active/eviction/intent state. The dashboard shows this under **Capacity** so operators can answer where a model is cached and why stale files have not been removed yet.
 
 Delete a model profile:
 
@@ -75,7 +75,16 @@ curl -fsS -X DELETE -H "Authorization: Bearer <admin-token>" \
   http://<manager-host>:1922/api/admin/nodes/<node-id>/artifacts/sha256:<artifact>
 ```
 
-Manual Worker eviction is blocked when the Worker is offline, the artifact is not cached there, or the artifact is still assigned or active on that Worker. Blocked, queued, evicted, and failed eviction records include bounded `conditions` with stable reasons such as `WorkerOffline`. To delete the Manager's stored artifact after all profiles and updates stop referencing it, use `DELETE /api/admin/artifacts/sha256:<artifact>` separately.
+Set an explicit stale-cache action for one selected Worker:
+
+```sh
+curl -fsS -X POST -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"keep"}' \
+  http://<manager-host>:1922/api/admin/nodes/<node-id>/artifacts/sha256:<artifact>
+```
+
+Actions are `keep`/`pin`, `evict`, and `evict_when_idle`. `keep` persists operator intent and excludes that stale cache entry from automatic eviction planning. `evict` queues immediate eviction and is blocked when the Worker is offline, the artifact is not cached there, or the artifact is still assigned, warming, or active on that Worker. `evict_when_idle` persists intent and queues eviction once the artifact is no longer assigned, warming, or active. Blocked, queued, evicted, and failed eviction records include bounded `conditions` with stable reasons such as `WorkerOffline`. To delete the Manager's stored artifact after all profiles and updates stop referencing it, use `DELETE /api/admin/artifacts/sha256:<artifact>` separately.
 
 ## Profile YAML
 
@@ -146,8 +155,10 @@ maxWarmProfilesPerNode: 0
 
 `0` for the per-node limits means "limited only by Worker memory, disk, and
 slots." In auto mode, the Manager derives effective desired ready copies from
-queued, running, and recent requests, then keeps downloaded copies at least as
-high as ready copies.
+queued, running, and smoothed recent requests, then keeps downloaded copies at
+least as high as ready copies. Scale-up happens immediately; scale-down waits
+for `COMRAD_AUTO_BALANCE_SCALE_DOWN_COOLDOWN_SECONDS` (default `300`) before
+dropping desired ready/downloaded copies.
 
 Apply capacity intent:
 
@@ -162,4 +173,4 @@ Profiles without requirements are unschedulable.
 
 Setting both `cachedCount` and `warmCount` to `0` stops keeping that profile hot for manual policies. For auto policies, set the min and max fields to `0` as well. If the artifact is not desired by another profile or update on a Worker, the Manager queues Worker cache eviction so old model files do not accumulate.
 
-Profiles and capacity policies also expose bounded `conditions` in Admin state. Profiles report `Ready`, `Schedulable`, and `ArtifactsAvailable`. Capacity policies report `Cached`, `Warm`, and `PlacementSatisfied`. These fields are derived from Manager state and are not editable configuration.
+Profiles and capacity policies also expose bounded `conditions` in Admin state. Profiles report `Ready`, `Schedulable`, and `ArtifactsAvailable`. Capacity policies report `Cached`, `Warm`, and `PlacementSatisfied`. Nodes report `WarmPlacementSuppressed` when recent flapping makes them temporarily ineligible for new warm placement. These fields are derived from Manager state and are not editable configuration.
