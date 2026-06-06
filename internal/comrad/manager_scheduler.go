@@ -2,6 +2,7 @@ package comrad
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -239,7 +240,28 @@ func (m *Manager) artifactSpecs(profile WorkloadProfile, baseURL string) []Artif
 			SizeBytes: artifact.SizeBytes,
 			URL:       strings.TrimRight(baseURL, "/") + "/api/worker/artifacts/" + artifact.ID,
 			Torrent:   cloneArtifactTorrent(artifact.Torrent),
+			P2PPeers:  m.peersForArtifact(db, id),
 		})
 	}
 	return specs
+}
+
+func (m *Manager) peersForArtifact(db Database, artifactID string) []string {
+	var peers []string
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, node := range db.Nodes {
+		if node.State != NodeStateOnline || node.P2P == nil || !node.P2P.Available || node.P2P.Port <= 0 {
+			continue
+		}
+		if !Contains(node.CachedArtifacts, artifactID) {
+			continue
+		}
+		sess := m.sessions[node.ID]
+		if sess == nil || sess.remoteHost == "" {
+			continue
+		}
+		peers = append(peers, fmt.Sprintf("%s:%d", sess.remoteHost, node.P2P.Port))
+	}
+	return peers
 }

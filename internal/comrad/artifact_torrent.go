@@ -64,3 +64,19 @@ func writeArtifactMetaInfoFile(artifactDir, artifactID string, body []byte) (str
 	}
 	return path, nil
 }
+
+func (m *Manager) migrateArtifactTorrentMetadata() error {
+	return m.store.Update(func(db *Database) error {
+		for id, artifact := range db.Artifacts {
+			if artifact.Torrent != nil && artifact.Torrent.InfoHash != "" && len(artifact.Torrent.MetaInfoBytes) > 0 {
+				continue
+			}
+			updated, err := ensureArtifactTorrentMetadata(artifact, m.cfg.ArtifactDir)
+			if err != nil {
+				continue
+			}
+			db.Artifacts[id] = updated
+		}
+		return nil
+	})
+}

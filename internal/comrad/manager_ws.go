@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -205,12 +206,13 @@ func (m *Manager) handleWorkerWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := &workerSession{
-		id:      NewID("ses"),
-		baseURL: m.baseURL(r),
-		conn:    conn,
-		manager: m,
-		send:    make(chan Envelope, 256),
-		done:    make(chan struct{}),
+		id:         NewID("ses"),
+		baseURL:    m.baseURL(r),
+		remoteHost: remoteHostOnly(r.RemoteAddr),
+		conn:       conn,
+		manager:    m,
+		send:       make(chan Envelope, 256),
+		done:       make(chan struct{}),
 	}
 	go s.writeLoop()
 	go s.readLoop()
@@ -378,4 +380,12 @@ func (s *workerSession) readLoop() {
 			s.enqueue(Envelope{ID: msg.ID, Type: MsgError, Payload: MarshalPayload(map[string]string{"error": err.Error()})})
 		}
 	}
+}
+
+func remoteHostOnly(addr string) string {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	return host
 }

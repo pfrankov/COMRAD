@@ -71,14 +71,15 @@ type streamEvent struct {
 }
 
 type workerSession struct {
-	id      string
-	nodeID  string
-	baseURL string
-	conn    *websocket.Conn
-	manager *Manager
-	send    chan Envelope
-	done    chan struct{}
-	once    sync.Once
+	id         string
+	nodeID     string
+	baseURL    string
+	remoteHost string
+	conn       *websocket.Conn
+	manager    *Manager
+	send       chan Envelope
+	done       chan struct{}
+	once       sync.Once
 }
 
 func NewManager(cfg ManagerConfig) (*Manager, error) {
@@ -105,6 +106,9 @@ func NewManager(cfg ManagerConfig) (*Manager, error) {
 	}
 	m.store.SetAfterUpdate(m.publishAdminState)
 	if err := m.ensureConfiguredClientKey(); err != nil {
+		return nil, err
+	}
+	if err := m.migrateArtifactTorrentMetadata(); err != nil {
 		return nil, err
 	}
 	return m, nil

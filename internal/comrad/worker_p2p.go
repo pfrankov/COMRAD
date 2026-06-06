@@ -54,6 +54,7 @@ type workerP2PRuntime interface {
 	Seed(artifact ArtifactSpec, path string) error
 	StopSeeding(artifactID string)
 	Download(ctx context.Context, artifact ArtifactSpec, target string) error
+	AddPeers(artifactID string, addrs []string)
 	RecordFallback(reason string, err error)
 	Close()
 }
@@ -154,10 +155,37 @@ func (p *anacrolixWorkerP2P) Download(ctx context.Context, artifact ArtifactSpec
 		p.dropTorrent(artifact.ID)
 		return &p2pDownloadError{reason: p2pFailureTimeout, err: err}
 	}
+	p.addPeersToTorrent(tor, artifact.P2PPeers)
 	p.setDownloading(artifact.ID, true)
 	defer p.setDownloading(artifact.ID, false)
 	tor.DownloadAll()
 	return p.waitForTorrentCompletion(ctx, artifact.ID, tor)
+}
+
+func (p *anacrolixWorkerP2P) AddPeers(artifactID string, addrs []string) {
+	if !p.Available() || len(addrs) == 0 {
+		return
+	}
+	p.mu.Lock()
+	tor := p.torrents[artifactID]
+	p.mu.Unlock()
+	if tor == nil {
+		return
+	}
+	p.addPeersToTorrent(tor, addrs)
+}
+
+func (p *anacrolixWorkerP2P) addPeersToTorrent(tor *torrent.Torrent, addrs []string) {
+	var peers []torrent.PeerInfo
+	for _, addr := range addrs {
+		peers = append(peers, torrent.PeerInfo{
+			Addr:   peerAddrAddr(addr),
+			Source: torrent.PeerSourceDirect,
+		})
+	}
+	if len(peers) > 0 {
+		tor.AddPeers(peers)
+	}
 }
 
 func (p *anacrolixWorkerP2P) ensureDownloadTorrent(artifact ArtifactSpec) (*torrent.Torrent, error) {
@@ -309,6 +337,11 @@ func maxInt(a, b int) int {
 	}
 	return b
 }
+
+type peerAddrAddr string
+
+func (a peerAddrAddr) String() string { return string(a) }
+func (a peerAddrAddr) Network() string { return "tcp" }
 
 func (w *Worker) initP2P() error {
 	factory := w.cfg.p2pFactory

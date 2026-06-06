@@ -68,6 +68,9 @@ func (w *Worker) downloadArtifactWithTorrent(ctx context.Context, artifact Artif
 	if w.p2p == nil || artifact.Torrent == nil {
 		return artifactDownloadResult{}, nil
 	}
+	if len(artifact.P2PPeers) > 0 {
+		w.p2p.AddPeers(artifact.ID, artifact.P2PPeers)
+	}
 	torrentCtx, cancel := context.WithTimeout(ctx, w.cfg.P2PDownloadTimeout)
 	defer cancel()
 	if err := w.p2p.Download(torrentCtx, artifact, target); err != nil {

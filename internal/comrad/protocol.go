@@ -62,6 +62,7 @@ type ArtifactSpec struct {
 	SizeBytes int64            `json:"sizeBytes"`
 	URL       string           `json:"url"`
 	Torrent   *ArtifactTorrent `json:"torrent,omitempty"`
+	P2PPeers  []string         `json:"p2pPeers,omitempty"`
 }
 
 type AssignmentPayload struct {

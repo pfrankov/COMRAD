@@ -143,6 +143,94 @@ func TestArtifactSpecsIncludeTorrentMetadata(t *testing.T) {
 	}
 }
 
+func TestArtifactSpecsIncludeP2PPeers(t *testing.T) {
+	manager, err := NewManager(ManagerConfig{
+		DBPath:       filepath.Join(t.TempDir(), "comrad.json"),
+		ArtifactDir:  filepath.Join(t.TempDir(), "artifacts"),
+		AdminToken:   "admin",
+		ClientAPIKey: "client",
+		WorkerToken:  "worker",
+		AutoApprove:  true,
+		QueueLimit:   2,
+		StreamWait:   time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := mustManagerArtifactWithTorrent(t, manager, "model.gguf", []byte("peer relay payload"))
+	profile := WorkloadProfile{ID: "profile-b", Artifacts: []string{artifact.ID}}
+
+	seeder := &workerSession{
+		id:         "ses-seeder",
+		nodeID:     "node-seeder",
+		baseURL:    "http://manager.test",
+		remoteHost: "192.168.1.50",
+		manager:    manager,
+		send:       make(chan Envelope, 1),
+		done:       make(chan struct{}),
+	}
+	manager.mu.Lock()
+	manager.sessions["node-seeder"] = seeder
+	manager.mu.Unlock()
+	if err := manager.store.Update(func(db *Database) error {
+		db.Nodes["node-seeder"] = Node{
+			ID:              "node-seeder",
+			State:           NodeStateOnline,
+			CachedArtifacts: []string{artifact.ID},
+			P2P:             &WorkerP2PStatus{Available: true, Port: 6881},
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	specs := manager.artifactSpecs(profile, "http://manager.test")
+	if len(specs) != 1 {
+		t.Fatalf("artifact specs len = %d, want 1", len(specs))
+	}
+	if len(specs[0].P2PPeers) != 1 || specs[0].P2PPeers[0] != "192.168.1.50:6881" {
+		t.Fatalf("expected peer 192.168.1.50:6881, got %v", specs[0].P2PPeers)
+	}
+}
+
+func TestArtifactSpecsOmitPeersForOfflineNode(t *testing.T) {
+	manager, err := NewManager(ManagerConfig{
+		DBPath:       filepath.Join(t.TempDir(), "comrad.json"),
+		ArtifactDir:  filepath.Join(t.TempDir(), "artifacts"),
+		AdminToken:   "admin",
+		ClientAPIKey: "client",
+		WorkerToken:  "worker",
+		AutoApprove:  true,
+		QueueLimit:   2,
+		StreamWait:   time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := mustManagerArtifactWithTorrent(t, manager, "model.gguf", []byte("offline peer"))
+	profile := WorkloadProfile{ID: "profile-c", Artifacts: []string{artifact.ID}}
+
+	if err := manager.store.Update(func(db *Database) error {
+		db.Nodes["node-offline"] = Node{
+			ID:              "node-offline",
+			State:           NodeStateOffline,
+			CachedArtifacts: []string{artifact.ID},
+			P2P:             &WorkerP2PStatus{Available: true, Port: 6881},
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	specs := manager.artifactSpecs(profile, "http://manager.test")
+	if len(specs) != 1 {
+		t.Fatalf("artifact specs len = %d, want 1", len(specs))
+	}
+	if len(specs[0].P2PPeers) != 0 {
+		t.Fatalf("expected no peers for offline node, got %v", specs[0].P2PPeers)
+	}
+}
+
 func TestDispatchUpdateIncludesArtifactTorrentMetadata(t *testing.T) {
 	manager, err := NewManager(ManagerConfig{
 		DBPath:       filepath.Join(t.TempDir(), "comrad.json"),
@@ -282,4 +370,55 @@ func adminGET(t *testing.T, baseURL, token, path string) string {
 
 func osWriteFile(path string, data []byte, mode os.FileMode) error {
 	return os.WriteFile(path, data, mode)
+}
+
+func TestMigrateArtifactTorrentMetadata(t *testing.T) {
+	manager, err := NewManager(ManagerConfig{
+		DBPath:       filepath.Join(t.TempDir(), "comrad.json"),
+		ArtifactDir:  filepath.Join(t.TempDir(), "artifacts"),
+		AdminToken:   "admin",
+		ClientAPIKey: "client",
+		WorkerToken:  "worker",
+		AutoApprove:  true,
+		QueueLimit:   2,
+		StreamWait:   time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "tiny.gguf")
+	if err := osWriteFile(modelPath, []byte("migrate me"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sha, size, err := FileSHA256(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := Artifact{
+		ID:        "sha256:" + strings.TrimPrefix(sha, "sha256:"),
+		Kind:      "model_gguf",
+		Name:      "tiny.gguf",
+		Path:      modelPath,
+		SHA256:    sha,
+		SizeBytes: size,
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := manager.store.Update(func(db *Database) error {
+		db.Artifacts[artifact.ID] = artifact
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.migrateArtifactTorrentMetadata(); err != nil {
+		t.Fatal(err)
+	}
+	db := manager.store.Snapshot()
+	updated, ok := db.Artifacts[artifact.ID]
+	if !ok {
+		t.Fatal("artifact missing after migration")
+	}
+	if updated.Torrent == nil || updated.Torrent.InfoHash == "" || len(updated.Torrent.MetaInfoBytes) == 0 {
+		t.Fatalf("artifact missing torrent metadata after migration: %+v", updated.Torrent)
+	}
 }
