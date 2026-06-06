@@ -17,7 +17,7 @@ The dashboard shows queue depth on **Overview** and task lifecycle on **Tasks**.
 
 The dashboard calls this **Capacity** because operators usually decide how many model copies should be downloaded and ready. The API and internal data model still call it placement policy. The policy controls desired cached and warm counts, optional auto-balance limits, tags, preferred nodes, denied nodes, and hard-pinned slots. The Manager builds profile-by-slot fit results and assigns profiles only to compatible slots.
 
-Workers apply node-local download pressure before fetching model artifacts. The default is one concurrent model artifact download per Worker, with additional cached or warm assignments queued on that Worker. Warm slot assignments report `download_queued` before `downloading_artifact`; cached-only assignments do not reserve a runtime slot while they wait.
+Workers apply node-local download pressure before fetching model artifacts. The default is one concurrent model artifact download per Worker, with additional cached or warm assignments queued on that Worker. Warm slot assignments report `download_queued` before `downloading_artifact`; cached-only assignments do not reserve a runtime slot while they wait. When an assigned artifact has torrent metadata and the Worker torrent runtime is available, the Worker first tries public BitTorrent delivery through DHT and magnet discovery. If torrent startup, peer discovery, timeout, transfer, or final digest verification fails, the Worker falls back to the authenticated Manager HTTP artifact URL.
 
 Manual policies use `cachedCount` and `warmCount` directly. Auto-balanced
 policies derive effective desired counts from queued requests, running
@@ -93,4 +93,4 @@ curl -sS -H "Authorization: Bearer <admin-token>" \
   http://<manager-host>:1922/api/admin/updates/workers/apply
 ```
 
-The dashboard **Updates** page explains the update purpose, shows pending records, previews impact, and lists failures.
+The dashboard **Updates** page explains the update purpose, shows pending records, previews impact, lists failures, and records whether the last successful artifact delivery used torrent, HTTP fallback, HTTP only, or mixed delivery across target Workers.

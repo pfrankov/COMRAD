@@ -33,7 +33,7 @@ Do not duplicate source-of-truth lists of hosts, services, models, roles, endpoi
 - Workers connect outbound to the Manager over one WebSocket at `/api/worker/ws`; the Manager never opens inbound connections to Workers.
 - Workers must heartbeat over the Manager WebSocket; missed heartbeats make the Manager mark the Worker offline, mark idle slots unavailable, and replan capacity.
 - Workers that repeatedly disconnect, reconnect, or expire heartbeats inside the configured flap window must be temporarily suppressed for new warm placement and expose the reason plus expiration in admin state.
-- Workers download model/update artifacts only through authenticated Manager artifact URLs and only when assigned.
+- Artifacts are public-distribution artifacts. Workers try public BitTorrent delivery for immutable assigned artifacts when their torrent runtime is available, fall back to authenticated Manager artifact URLs when torrent delivery is unavailable or fails, and must still verify COMRAD SHA-256 before treating an artifact as cached.
 - Workers evict cached model artifacts only when the Manager requests it; eviction is allowed only for artifacts that are no longer desired or active on that Worker.
 - Runtime executables such as `llama-server` are Worker-installed capabilities, not model artifacts. The macOS Worker bundle must include the pinned `llama-server` runtime by default; explicit archive overrides remain operator-controlled. Runtime processes stay local to the Worker and must not be exposed to the LAN.
 - Admin artifact deletion must be guarded: artifacts still referenced by profiles or updates are not deletable.

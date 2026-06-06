@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"comrad/internal/comrad"
 )
@@ -25,6 +26,9 @@ func main() {
 		VRAMBytes:              envInt64("COMRAD_WORKER_VRAM_BYTES", 0),
 		UnifiedBytes:           envInt64("COMRAD_WORKER_UNIFIED_BYTES", 8<<30),
 		DiskBytes:              envInt64("COMRAD_WORKER_DISK_BYTES", 20<<30),
+		P2PPort:                envInt("COMRAD_WORKER_P2P_PORT", 6881),
+		P2PMaxUploads:          envInt("COMRAD_WORKER_P2P_MAX_UPLOADS", 8),
+		P2PDownloadTimeout:     time.Duration(envInt("COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS", 120)) * time.Second,
 		EnableSelfUpdate:       envBool("COMRAD_ENABLE_SELF_UPDATE", false),
 	}
 	worker, err := comrad.NewWorker(cfg)

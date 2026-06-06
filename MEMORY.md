@@ -20,7 +20,7 @@ It stores important project context that is easy to lose between sessions: non-o
 - Dashboard model operations are centered on **Models**. **Add a model** uploads or imports model artifact sets and creates profile/policy; **Edit model** updates the client model name, args, budgets, cost, ready/downloaded copy counts, or replacement artifacts. **Capacity** is the user-facing name for placement policy.
 - Capacity policies can opt into auto-balance with min/max downloaded and ready counts. The planner derives effective demand from queued, running, and smoothed recent requests, scales up immediately, waits for the scale-down cooldown before removing desired copies, and plans globally across Worker RAM/disk so scarce large models are placed before smaller extras.
 - Worker flapping is tracked from disconnect, reconnect, and heartbeat-expiry events. Flapping Workers remain visible but are temporarily suppressed for new warm placement until the configured cooldown expires.
-- Workers default to one concurrent model artifact download per node. Extra cached-only or warm assignments queue on the Worker; warm slots report `download_queued` before artifact transfer begins.
+- Workers default to one concurrent model artifact download per node. Extra cached-only or warm assignments queue on the Worker; warm slots report `download_queued` before artifact transfer begins. When available, Workers first try public BitTorrent delivery for immutable artifacts and fall back to Manager HTTP when torrent delivery is unavailable, slow, or fails verification.
 - Deleting a model removes its profile, capacity policy, and assignments, then queues guarded Worker cache eviction for artifacts that are no longer desired, warming, or active. Admin cache actions on a selected Worker can keep/pin stale cache, evict it now, or persist evict-when-idle intent.
 - Worker cache cleanup records are persisted as `artifactEvictions` and shown in Nodes technical details so operators can see queued, blocked, evicted, and failed cleanup even after an artifact leaves the current cache list.
 - Storage deletion is intentionally guarded: artifacts referenced by profiles or updates cannot be deleted; uploaded Manager-owned files are removed from disk, while external Manager-local imports are only unregistered.
@@ -34,7 +34,7 @@ It stores important project context that is easy to lose between sessions: non-o
 - New Manager runtime storage is SQL-backed: `COMRAD_STORAGE_MODE=auto` uses PostgreSQL from `COMRAD_DATABASE_URL` when reachable, otherwise SQLite at `COMRAD_SQLITE_PATH`. Direct `.json` store paths exist only for legacy compatibility tests.
 - The user-facing default Manager port is `1922`; Docker internals still listen on `8080` inside the compose network.
 - README is intentionally a short getting-started path. Detailed operations, model, scheduling, dashboard, and accounting material belongs under `docs/`.
-- The root product requirements file should describe real implementation status and current requirements, not treat future Windows/Linux/NVIDIA/P2P/payment work as already supported.
+- The root product requirements file should describe real implementation status and current requirements, not treat future Windows/Linux/NVIDIA/payment work as already supported.
 
 ## Operational Findings
 

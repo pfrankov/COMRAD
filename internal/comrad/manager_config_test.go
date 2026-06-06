@@ -27,6 +27,12 @@ func TestAdminConfigYAMLRedactsSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := manager.store.Update(func(db *Database) error {
+		db.Nodes["node-a"] = Node{ID: "node-a", State: NodeStateOnline, Approved: true, P2P: &WorkerP2PStatus{Available: true, Port: 39011, MaxUploads: 12, DownloadTimeoutSeconds: 45}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	server := httptest.NewServer(manager.Handler())
 	defer server.Close()
 
@@ -65,6 +71,12 @@ func TestAdminConfigYAMLRedactsSecrets(t *testing.T) {
 		"cooldownSeconds: 300",
 		"workers:",
 		"connection: outboundWebSocket",
+		"p2p:",
+		"mode: bestEffortPublicBitTorrent",
+		"defaultPort: 6881",
+		"availableWorkers: 1",
+		"effectivePorts:",
+		"- 39011",
 		"observability:",
 		"dashboardStateStream: websocket",
 	} {

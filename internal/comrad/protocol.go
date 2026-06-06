@@ -55,12 +55,13 @@ type WorkerRegistrationAck struct {
 }
 
 type ArtifactSpec struct {
-	ID        string `json:"artifactId"`
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
-	SHA256    string `json:"sha256"`
-	SizeBytes int64  `json:"sizeBytes"`
-	URL       string `json:"url"`
+	ID        string           `json:"artifactId"`
+	Kind      string           `json:"kind"`
+	Name      string           `json:"name"`
+	SHA256    string           `json:"sha256"`
+	SizeBytes int64            `json:"sizeBytes"`
+	URL       string           `json:"url"`
+	Torrent   *ArtifactTorrent `json:"torrent,omitempty"`
 }
 
 type AssignmentPayload struct {
@@ -132,8 +133,8 @@ type AttemptFailedPayload struct {
 }
 
 type UpdatePayload struct {
-	Update UpdateRecord `json:"update"`
-	URL    string       `json:"url"`
+	Update   UpdateRecord `json:"update"`
+	Artifact ArtifactSpec `json:"artifact"`
 }
 
 type ChatMessage struct {

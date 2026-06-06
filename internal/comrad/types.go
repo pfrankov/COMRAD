@@ -73,6 +73,19 @@ type DownloadPressure struct {
 	Queued        int `json:"queued"`
 }
 
+type WorkerP2PStatus struct {
+	Available              bool       `json:"available"`
+	Port                   int        `json:"port,omitempty"`
+	MaxUploads             int        `json:"maxUploads,omitempty"`
+	DownloadTimeoutSeconds int64      `json:"downloadTimeoutSeconds,omitempty"`
+	SeedingCount           int        `json:"seedingCount,omitempty"`
+	DownloadingCount       int        `json:"downloadingCount,omitempty"`
+	PeerCount              int        `json:"peers,omitempty"`
+	FallbackCount          int        `json:"fallbackCount,omitempty"`
+	LastFailure            string     `json:"lastFailure,omitempty"`
+	LastFailureAt          *time.Time `json:"lastFailureAt,omitempty"`
+}
+
 type Node struct {
 	ID                             string            `json:"nodeId"`
 	OwnerUserID                    string            `json:"ownerUserId,omitempty"`
@@ -87,6 +100,7 @@ type Node struct {
 	RuntimeAdapters                []string          `json:"runtimeAdapters"`
 	Budgets                        ResourceBudget    `json:"budgets"`
 	DownloadPressure               DownloadPressure  `json:"downloadPressure"`
+	P2P                            *WorkerP2PStatus  `json:"p2p,omitempty"`
 	CachedArtifacts                []string          `json:"cachedArtifacts"`
 	WarmProfiles                   []string          `json:"warmProfiles"`
 	LastSeen                       time.Time         `json:"lastSeen"`
@@ -139,14 +153,23 @@ type Slot struct {
 	Conditions       []Condition    `json:"conditions,omitempty"`
 }
 
+type ArtifactTorrent struct {
+	InfoHash      string `json:"infoHash"`
+	MagnetURI     string `json:"magnetUri"`
+	PieceLength   int64  `json:"pieceLength"`
+	MetaInfoPath  string `json:"metainfoPath,omitempty"`
+	MetaInfoBytes []byte `json:"metainfoBytes,omitempty"`
+}
+
 type Artifact struct {
-	ID        string    `json:"artifactId"`
-	Kind      string    `json:"kind"`
-	Name      string    `json:"name"`
-	Path      string    `json:"path"`
-	SHA256    string    `json:"sha256"`
-	SizeBytes int64     `json:"sizeBytes"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        string           `json:"artifactId"`
+	Kind      string           `json:"kind"`
+	Name      string           `json:"name"`
+	Path      string           `json:"path"`
+	SHA256    string           `json:"sha256"`
+	SizeBytes int64            `json:"sizeBytes"`
+	Torrent   *ArtifactTorrent `json:"torrent,omitempty"`
+	CreatedAt time.Time        `json:"createdAt"`
 }
 
 type ArtifactEvictionRecord struct {
@@ -378,17 +401,19 @@ type ComputeReport struct {
 }
 
 type UpdateRecord struct {
-	ID          string    `json:"updateId"`
-	Kind        string    `json:"kind"`
-	Version     string    `json:"version"`
-	ArtifactID  string    `json:"artifactId"`
-	SHA256      string    `json:"sha256"`
-	Signature   string    `json:"signature,omitempty"`
-	PublicKey   string    `json:"publicKey,omitempty"`
-	TargetNodes []string  `json:"targetNodes,omitempty"`
-	Status      string    `json:"status"`
-	Failure     string    `json:"failure,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID             string    `json:"updateId"`
+	Kind           string    `json:"kind"`
+	Version        string    `json:"version"`
+	ArtifactID     string    `json:"artifactId"`
+	SHA256         string    `json:"sha256"`
+	Delivery       string    `json:"delivery,omitempty"`
+	DeliveryDetail string    `json:"deliveryDetail,omitempty"`
+	Signature      string    `json:"signature,omitempty"`
+	PublicKey      string    `json:"publicKey,omitempty"`
+	TargetNodes    []string  `json:"targetNodes,omitempty"`
+	Status         string    `json:"status"`
+	Failure        string    `json:"failure,omitempty"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 type AuditEvent struct {

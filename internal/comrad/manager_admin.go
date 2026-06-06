@@ -3,7 +3,6 @@ package comrad
 import (
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -76,54 +75,6 @@ func (m *Manager) handleAdminSlots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, SortedSlots(m.store.Snapshot()))
-}
-
-func (m *Manager) handleAdminArtifacts(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		writeJSON(w, http.StatusOK, SortedArtifacts(m.store.Snapshot()))
-	case http.MethodPost:
-		var req CreateArtifactRequest
-		if err := readConfig(r, &req); err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-			return
-		}
-		if req.Path == "" {
-			writeError(w, http.StatusBadRequest, "bad_request", "path is required")
-			return
-		}
-		sha, size, err := FileSHA256(req.Path)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "artifact_unreadable", err.Error())
-			return
-		}
-		if req.SHA256 != "" && NormalizeSHA256(req.SHA256) != sha {
-			writeError(w, http.StatusBadRequest, FailureArtifactDigestMismatch, fmt.Sprintf("expected %s got %s", NormalizeSHA256(req.SHA256), sha))
-			return
-		}
-		name := req.Name
-		if name == "" {
-			name = filepath.Base(req.Path)
-		}
-		kind := req.Kind
-		if kind == "" {
-			kind = "model_gguf"
-		}
-		abs, _ := filepath.Abs(req.Path)
-		artifact := Artifact{ID: "sha256:" + strings.TrimPrefix(sha, "sha256:"), Kind: kind, Name: name, Path: abs, SHA256: sha, SizeBytes: size, CreatedAt: time.Now().UTC()}
-		err = m.store.Update(func(db *Database) error {
-			db.Artifacts[artifact.ID] = artifact
-			db.Audit = append(db.Audit, AuditEvent{ID: NewID("aud"), Type: "artifact.registered", Actor: "admin", Subject: artifact.ID, CreatedAt: time.Now().UTC()})
-			return nil
-		})
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "store_error", err.Error())
-			return
-		}
-		writeJSON(w, http.StatusCreated, artifact)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
 }
 
 func (m *Manager) handleAdminProfiles(w http.ResponseWriter, r *http.Request) {

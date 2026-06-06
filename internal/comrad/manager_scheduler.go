@@ -238,6 +238,7 @@ func (m *Manager) artifactSpecs(profile WorkloadProfile, baseURL string) []Artif
 			SHA256:    artifact.SHA256,
 			SizeBytes: artifact.SizeBytes,
 			URL:       strings.TrimRight(baseURL, "/") + "/api/worker/artifacts/" + artifact.ID,
+			Torrent:   cloneArtifactTorrent(artifact.Torrent),
 		})
 	}
 	return specs

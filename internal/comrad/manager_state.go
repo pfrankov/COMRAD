@@ -33,7 +33,7 @@ func (m *Manager) stateResponse() StateResponse {
 		SchemaVersion:     db.SchemaVersion,
 		Nodes:             SortedNodes(db),
 		Slots:             SortedSlots(db),
-		Artifacts:         SortedArtifacts(db),
+		Artifacts:         adminArtifacts(db),
 		ArtifactEvictions: sortedArtifactEvictions(db),
 		Profiles:          SortedProfiles(db),
 		Policies:          SortedPolicies(db),
@@ -54,6 +54,23 @@ func (m *Manager) stateResponse() StateResponse {
 		Queue:             QueueState{Limit: cap(m.queue), InUse: len(m.queue), Queued: queuedTaskCount(db)},
 		AuditTail:         audit,
 	}
+}
+
+func adminArtifacts(db Database) []Artifact {
+	artifacts := SortedArtifacts(db)
+	for i := range artifacts {
+		artifacts[i] = sanitizeArtifactForAdmin(artifacts[i])
+	}
+	return artifacts
+}
+
+func sanitizeArtifactForAdmin(artifact Artifact) Artifact {
+	out := cloneArtifact(artifact)
+	if out.Torrent != nil {
+		out.Torrent.MetaInfoPath = ""
+		out.Torrent.MetaInfoBytes = nil
+	}
+	return out
 }
 
 func queuedTaskCount(db Database) int {

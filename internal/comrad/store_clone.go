@@ -12,7 +12,7 @@ func cloneDatabase(db Database) Database {
 		Migrations:        slices.Clone(db.Migrations),
 		Nodes:             cloneMapValues(db.Nodes, cloneNode),
 		Slots:             cloneMapValues(db.Slots, cloneSlot),
-		Artifacts:         maps.Clone(db.Artifacts),
+		Artifacts:         cloneMapValues(db.Artifacts, cloneArtifact),
 		ArtifactEvictions: cloneMapValues(db.ArtifactEvictions, cloneArtifactEvictionRecord),
 		CacheIntents:      maps.Clone(db.CacheIntents),
 		Profiles:          cloneMapValues(db.Profiles, cloneWorkloadProfile),
@@ -45,6 +45,7 @@ func cloneNode(in Node) Node {
 	out := in
 	out.Tags = slices.Clone(in.Tags)
 	out.RuntimeAdapters = slices.Clone(in.RuntimeAdapters)
+	out.P2P = cloneWorkerP2PStatus(in.P2P)
 	out.CachedArtifacts = slices.Clone(in.CachedArtifacts)
 	out.WarmProfiles = slices.Clone(in.WarmProfiles)
 	out.LastFailureAt = cloneTimePtr(in.LastFailureAt)
@@ -54,6 +55,30 @@ func cloneNode(in Node) Node {
 	out.Conditions = cloneConditions(in.Conditions)
 	out.ConnectedSession = ""
 	return out
+}
+
+func cloneArtifact(in Artifact) Artifact {
+	out := in
+	out.Torrent = cloneArtifactTorrent(in.Torrent)
+	return out
+}
+
+func cloneArtifactTorrent(in *ArtifactTorrent) *ArtifactTorrent {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.MetaInfoBytes = slices.Clone(in.MetaInfoBytes)
+	return &out
+}
+
+func cloneWorkerP2PStatus(in *WorkerP2PStatus) *WorkerP2PStatus {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.LastFailureAt = cloneTimePtr(in.LastFailureAt)
+	return &out
 }
 
 func cloneSlot(in Slot) Slot {

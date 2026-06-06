@@ -145,6 +145,9 @@ cd dist/bundle-darwin-arm64
 COMRAD_MANAGER_URL='http://<manager-host>:1922' \
 COMRAD_WORKER_TOKEN='<worker-token>' \
 COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS=1 \
+COMRAD_WORKER_P2P_PORT=6881 \
+COMRAD_WORKER_P2P_MAX_UPLOADS=8 \
+COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS=120 \
 COMRAD_WORKER_UNIFIED_BYTES=17179869184 \
 COMRAD_WORKER_DISK_BYTES=21474836480 \
 scripts/install-worker-macos.sh
@@ -152,6 +155,7 @@ scripts/install-worker-macos.sh
 
 Use `COMRAD_MANAGER_URL=http://127.0.0.1:1922` when the Manager and Worker run on the same Mac.
 Workers default to one concurrent model artifact download so multiple queued cached or warm assignments do not saturate one node.
+Workers also try public BitTorrent delivery for immutable artifacts whenever torrent networking starts successfully. There is no operator enable switch: tune only `COMRAD_WORKER_P2P_PORT`, `COMRAD_WORKER_P2P_MAX_UPLOADS`, and `COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS`. If torrent startup, peers, or verification fail, the Worker falls back to Manager HTTP and still verifies SHA-256 before caching.
 
 ## Add The First Model
 
@@ -166,6 +170,7 @@ The dashboard path is the shortest path for normal use:
 7. Watch **Models**, **Capacity**, and **Nodes** until the model is ready.
 
 COMRAD separates the client model name from the concrete files Workers execute. A profile can point at one or more model artifacts, and Workers refresh ready slots when that profile changes.
+Uploaded and imported artifacts are public-distribution artifacts: the Manager creates one stable torrent per immutable artifact, and Workers reuse that torrent identity for model files, support files, and Worker updates.
 
 Deleting a model from **Models** removes its profile and capacity policy, then asks online Workers to evict cached files that are no longer desired, warming, or active. Admin APIs can also keep a stale cached artifact, evict it now, or mark it for eviction when it becomes idle on one selected Worker.
 

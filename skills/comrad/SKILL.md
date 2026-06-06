@@ -78,12 +78,15 @@ cd dist/bundle-darwin-arm64
 COMRAD_MANAGER_URL="$BASE_URL" \
 COMRAD_WORKER_TOKEN="$WORKER_TOKEN" \
 COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS=1 \
+COMRAD_WORKER_P2P_PORT=6881 \
+COMRAD_WORKER_P2P_MAX_UPLOADS=8 \
+COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS=120 \
 COMRAD_WORKER_UNIFIED_BYTES=17179869184 \
 COMRAD_WORKER_DISK_BYTES=21474836480 \
 scripts/install-worker-macos.sh
 ```
 
-Workers default to one concurrent model artifact download per node; raise `COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS` only after confirming the node and Manager artifact path can absorb parallel model transfers.
+Workers default to one concurrent model artifact download per node; raise `COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS` only after confirming the node and Manager artifact path can absorb parallel model transfers. Workers also try public BitTorrent delivery for immutable artifacts whenever torrent networking starts successfully. There is no operator enable switch; tune only `COMRAD_WORKER_P2P_PORT`, `COMRAD_WORKER_P2P_MAX_UPLOADS`, and `COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS`, and expect authenticated Manager HTTP fallback plus final SHA-256 verification when torrent delivery is unavailable or fails.
 
 The macOS bundle includes `bin/llama-server`. The installer copies it by default and verifies startup. Use `COMRAD_LLAMA_CPP_URL` and `COMRAD_LLAMA_CPP_SHA256` to install a different llama.cpp archive; if a custom bundle is missing `bin/llama-server`, the installer downloads the pinned archive as a fallback.
 

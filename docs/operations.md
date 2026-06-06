@@ -44,7 +44,7 @@ The Compose Manager uses `COMRAD_STORAGE_MODE=auto`. It stores state in PostgreS
 
 Compose mounts `./imports` read-only at `/var/lib/comrad/imports` inside the Manager container for Admin API path imports. Browser uploads through **Models** are stored in `COMRAD_ARTIFACT_DIR`.
 
-`COMRAD_EXTERNAL_URL` should be the URL Workers and operators use from outside the container host. It is used for authenticated artifact URLs and generated Worker join commands. `COMRAD_CLIENT_API_KEY` is bootstrapped into a default API client for initial verification. Set `COMRAD_ENFORCE_BALANCE=true` when positive-cost profiles should require enough client balance. `COMRAD_WORKER_HEARTBEAT_TIMEOUT_SECONDS` controls when a silent Worker connection is marked offline; the default is `30`. Worker flap detection defaults to `COMRAD_WORKER_FLAP_THRESHOLD=4`, `COMRAD_WORKER_FLAP_WINDOW_SECONDS=300`, and `COMRAD_WORKER_FLAP_COOLDOWN_SECONDS=300`.
+`COMRAD_EXTERNAL_URL` should be the URL Workers and operators use from outside the container host. It is used for authenticated HTTP fallback artifact URLs and generated Worker join commands. `COMRAD_CLIENT_API_KEY` is bootstrapped into a default API client for initial verification. Set `COMRAD_ENFORCE_BALANCE=true` when positive-cost profiles should require enough client balance. `COMRAD_WORKER_HEARTBEAT_TIMEOUT_SECONDS` controls when a silent Worker connection is marked offline; the default is `30`. Worker flap detection defaults to `COMRAD_WORKER_FLAP_THRESHOLD=4`, `COMRAD_WORKER_FLAP_WINDOW_SECONDS=300`, and `COMRAD_WORKER_FLAP_COOLDOWN_SECONDS=300`.
 
 Start a local Manager from the bundle:
 
@@ -63,6 +63,9 @@ cd dist/bundle-darwin-arm64
 COMRAD_MANAGER_URL='http://127.0.0.1:1922' \
 COMRAD_WORKER_TOKEN='<worker-token>' \
 COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS=1 \
+COMRAD_WORKER_P2P_PORT=6881 \
+COMRAD_WORKER_P2P_MAX_UPLOADS=8 \
+COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS=120 \
 scripts/run-local-worker.sh
 ```
 
@@ -73,12 +76,16 @@ cd dist/bundle-darwin-arm64
 COMRAD_MANAGER_URL='http://<manager-host>:1922' \
 COMRAD_WORKER_TOKEN='<worker-token>' \
 COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS=1 \
+COMRAD_WORKER_P2P_PORT=6881 \
+COMRAD_WORKER_P2P_MAX_UPLOADS=8 \
+COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS=120 \
 COMRAD_WORKER_UNIFIED_BYTES=17179869184 \
 COMRAD_WORKER_DISK_BYTES=21474836480 \
 scripts/install-worker-macos.sh
 ```
 
 Workers default to one concurrent model artifact download per node. Increase `COMRAD_WORKER_MAX_CONCURRENT_DOWNLOADS` only when the Worker storage, network, and Manager artifact serving path can tolerate parallel model transfers. Warm assignments queued behind download pressure report `download_queued` on the assigned slot before the Worker begins the artifact transfer.
+Workers also attempt public BitTorrent delivery for immutable artifacts whenever their torrent runtime starts successfully. There is no separate enable switch. `COMRAD_WORKER_P2P_PORT`, `COMRAD_WORKER_P2P_MAX_UPLOADS`, and `COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS` tune only the Worker networking behavior; when torrent startup, peer discovery, timeout, or final digest verification fail, COMRAD falls back to the authenticated Manager HTTP artifact path.
 
 The installer copies the bundled `bin/llama-server` by default, ad-hoc signs installed macOS binaries, and verifies startup. Set both `COMRAD_LLAMA_CPP_URL` and `COMRAD_LLAMA_CPP_SHA256` to install a different llama.cpp archive. If a custom bundle is missing `bin/llama-server`, the installer downloads COMRAD's pinned archive as a fallback.
 
@@ -98,7 +105,7 @@ curl -fsS -H "Authorization: Bearer <admin-token>" \
   http://<manager-host>:1922/api/admin/config.yaml
 ```
 
-The same read-only config is shown with highlighting in dashboard **Settings**. Tokens and database URLs are redacted; use this for effective process configuration, not for secret recovery. The YAML is grouped by operator concern: `manager`, `storage`, `auth`, `scheduler`, `workers`, and `observability`. The `scheduler` group includes `autoBalanceScaleDownCooldownSeconds`, which comes from `COMRAD_AUTO_BALANCE_SCALE_DOWN_COOLDOWN_SECONDS` and defaults to `300`, plus `workerFlap` thresholds for warm-placement suppression.
+The same read-only config is shown with highlighting in dashboard **Settings**. Tokens and database URLs are redacted; use this for effective process configuration, not for secret recovery. The YAML is grouped by operator concern: `manager`, `storage`, `auth`, `scheduler`, `workers`, and `observability`. The `scheduler` group includes `autoBalanceScaleDownCooldownSeconds`, which comes from `COMRAD_AUTO_BALANCE_SCALE_DOWN_COOLDOWN_SECONDS` and defaults to `300`, plus `workerFlap` thresholds for warm-placement suppression. The `workers.p2p` section summarizes public BitTorrent mode, runtime availability, and the effective Worker port, upload, and timeout values reported by connected Workers.
 
 Dashboard **Settings** also shows a read-only runtime summary derived from profiles, Workers, and slots. It lists runtime adapters, supported model formats, task kinds, Worker-installed runtime command, COMRAD-managed runtime flags, available Workers, and ready slots.
 

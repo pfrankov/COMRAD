@@ -16,7 +16,7 @@ import (
 )
 
 func (w *Worker) handleUpdate(payload UpdatePayload) {
-	if payload.URL == "" {
+	if payload.Artifact.ID == "" || payload.Artifact.URL == "" {
 		return
 	}
 	for {
@@ -28,11 +28,16 @@ func (w *Worker) handleUpdate(payload UpdatePayload) {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	spec := ArtifactSpec{ID: payload.Update.ArtifactID, Name: payload.Update.ArtifactID, SHA256: payload.Update.SHA256, URL: payload.URL, Kind: "worker_update"}
-	if err := w.ensureArtifact(context.Background(), spec); err != nil {
+	spec := payload.Artifact
+	if spec.Kind == "" {
+		spec.Kind = "worker_update"
+	}
+	result, err := w.ensureArtifactDetailed(context.Background(), spec, nil)
+	if err != nil {
 		w.sendUpdateTelemetry(payload.Update.ID, "update_failed", err.Error())
 		return
 	}
+	w.sendUpdateTelemetry(payload.Update.ID, "update_downloaded", result.Method)
 	w.mu.Lock()
 	path := w.cache[payload.Update.ArtifactID]
 	w.mu.Unlock()
@@ -120,9 +125,18 @@ func copyFile(src, dst string, mode os.FileMode) error {
 
 func (w *Worker) saveState() error {
 	w.mu.Lock()
-	state := workerStateFile{NodeID: w.node.ID, NodeToken: w.nodeToken, Cache: map[string]string{}}
+	state := workerStateFile{
+		NodeID:          w.node.ID,
+		NodeToken:       w.nodeToken,
+		Cache:           map[string]string{},
+		CachedArtifacts: map[string]cachedArtifactState{},
+	}
 	for k, v := range w.cache {
 		state.Cache[k] = v
+		state.CachedArtifacts[k] = cachedArtifactState{Path: v}
+		if cached := w.cacheState[k]; cached.Torrent != nil {
+			state.CachedArtifacts[k] = cachedArtifactState{Path: v, Torrent: cloneArtifactTorrent(cached.Torrent)}
+		}
 	}
 	for id := range w.warm {
 		state.WarmProfile = append(state.WarmProfile, id)

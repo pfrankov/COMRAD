@@ -52,6 +52,7 @@ func mergeExistingNodeConfig(node *Node, existing Node) {
 func copyNodeFailureState(node *Node, existing Node) {
 	node.LastFailure = existing.LastFailure
 	node.LastFailureAt = existing.LastFailureAt
+	node.P2P = cloneWorkerP2PStatus(existing.P2P)
 	node.Quarantined = existing.Quarantined
 	node.QuarantineReason = existing.QuarantineReason
 	node.QuarantineUntil = existing.QuarantineUntil

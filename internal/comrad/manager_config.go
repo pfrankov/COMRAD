@@ -2,6 +2,7 @@ package comrad
 
 import (
 	"net/http"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -58,8 +59,22 @@ type QuarantineConfigYAML struct {
 }
 
 type WorkersConfigYAML struct {
-	Connection  string `yaml:"connection"`
-	AutoApprove bool   `yaml:"autoApprove"`
+	Connection  string              `yaml:"connection"`
+	AutoApprove bool                `yaml:"autoApprove"`
+	P2P         WorkerP2PConfigYAML `yaml:"p2p"`
+}
+
+type WorkerP2PConfigYAML struct {
+	Mode                            string  `yaml:"mode"`
+	Discovery                       string  `yaml:"discovery"`
+	DefaultPort                     int     `yaml:"defaultPort"`
+	DefaultMaxUploads               int     `yaml:"defaultMaxUploads"`
+	DefaultDownloadTimeoutSeconds   int64   `yaml:"defaultDownloadTimeoutSeconds"`
+	AvailableWorkers                int     `yaml:"availableWorkers"`
+	ReportingWorkers                int     `yaml:"reportingWorkers"`
+	EffectivePorts                  []int   `yaml:"effectivePorts,omitempty"`
+	EffectiveMaxUploads             []int   `yaml:"effectiveMaxUploads,omitempty"`
+	EffectiveDownloadTimeoutSeconds []int64 `yaml:"effectiveDownloadTimeoutSeconds,omitempty"`
 }
 
 type ObservabilityConfigYAML struct {
@@ -84,6 +99,7 @@ func (m *Manager) handleAdminConfigYAML(w http.ResponseWriter, r *http.Request) 
 
 func (m *Manager) runtimeConfigYAML() RuntimeConfigYAML {
 	cfg := m.cfg
+	db := m.store.Snapshot()
 	return RuntimeConfigYAML{
 		Version: Version,
 		Manager: ManagerConfigYAML{
@@ -122,11 +138,94 @@ func (m *Manager) runtimeConfigYAML() RuntimeConfigYAML {
 		Workers: WorkersConfigYAML{
 			Connection:  "outboundWebSocket",
 			AutoApprove: cfg.AutoApprove,
+			P2P:         workerP2PConfigYAML(db),
 		},
 		Observability: ObservabilityConfigYAML{
 			DashboardStateStream: "websocket",
 		},
 	}
+}
+
+func workerP2PConfigYAML(db Database) WorkerP2PConfigYAML {
+	ports := uniqueWorkerP2PPorts(db)
+	maxUploads := uniqueWorkerP2PMaxUploads(db)
+	timeouts := uniqueWorkerP2PTimeouts(db)
+	return WorkerP2PConfigYAML{
+		Mode:                            "bestEffortPublicBitTorrent",
+		Discovery:                       "publicDHTAndMagnet",
+		DefaultPort:                     defaultWorkerP2PPort,
+		DefaultMaxUploads:               defaultWorkerP2PMaxUploads,
+		DefaultDownloadTimeoutSeconds:   int64(defaultWorkerP2PDownloadTimeout.Seconds()),
+		AvailableWorkers:                countWorkerP2PAvailable(db),
+		ReportingWorkers:                countWorkerP2PReporting(db),
+		EffectivePorts:                  ports,
+		EffectiveMaxUploads:             maxUploads,
+		EffectiveDownloadTimeoutSeconds: timeouts,
+	}
+}
+
+func countWorkerP2PAvailable(db Database) int {
+	count := 0
+	for _, node := range db.Nodes {
+		if node.P2P != nil && node.P2P.Available {
+			count++
+		}
+	}
+	return count
+}
+
+func countWorkerP2PReporting(db Database) int {
+	count := 0
+	for _, node := range db.Nodes {
+		if node.P2P != nil {
+			count++
+		}
+	}
+	return count
+}
+
+func uniqueWorkerP2PPorts(db Database) []int {
+	set := map[int]bool{}
+	for _, node := range db.Nodes {
+		if node.P2P != nil && node.P2P.Port > 0 {
+			set[node.P2P.Port] = true
+		}
+	}
+	return sortedIntKeys(set)
+}
+
+func uniqueWorkerP2PMaxUploads(db Database) []int {
+	set := map[int]bool{}
+	for _, node := range db.Nodes {
+		if node.P2P != nil && node.P2P.MaxUploads > 0 {
+			set[node.P2P.MaxUploads] = true
+		}
+	}
+	return sortedIntKeys(set)
+}
+
+func uniqueWorkerP2PTimeouts(db Database) []int64 {
+	set := map[int64]bool{}
+	for _, node := range db.Nodes {
+		if node.P2P != nil && node.P2P.DownloadTimeoutSeconds > 0 {
+			set[node.P2P.DownloadTimeoutSeconds] = true
+		}
+	}
+	out := make([]int64, 0, len(set))
+	for value := range set {
+		out = append(out, value)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func sortedIntKeys(set map[int]bool) []int {
+	out := make([]int, 0, len(set))
+	for value := range set {
+		out = append(out, value)
+	}
+	slices.Sort(out)
+	return out
 }
 
 func redactedConfigValue(value string) string {

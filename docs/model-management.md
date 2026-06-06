@@ -55,6 +55,8 @@ curl -fsS -X DELETE -H "Authorization: Bearer <admin-token>" \
 
 Deletion is blocked while an artifact is referenced by a profile or update. Uploaded files stored in the Manager artifact directory are removed from disk; path imports registered through the Admin API are unregistered but the source file is left in place.
 
+Each immutable artifact is also a public-distribution artifact. On upload or import, the Manager generates one stable torrent identity for that exact artifact and reuses it everywhere COMRAD assigns the artifact later. Workers try public DHT and magnet-based BitTorrent delivery first when their torrent runtime is available, then fall back to authenticated Manager HTTP download when torrent networking is unavailable, unproductive, or fails verification. SHA-256 remains the final correctness check before an artifact counts as cached.
+
 ## Worker Cache Cleanup
 
 Model deletion and capacity changes clean Worker caches automatically. When a profile is deleted, or when a policy lowers downloaded/ready copies so an artifact is no longer desired on a Worker, the Manager sends an eviction command to that Worker. The Manager does not evict artifacts that are still assigned, warming, or serving active work. The Worker stops affected warm runtimes, clears stale slot state, deletes the cached file, and reports `evicted`.

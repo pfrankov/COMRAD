@@ -251,7 +251,7 @@ export function UpdatesPage({
             {t(
               "updates.records.description",
               undefined,
-              "Created update attempts, status, artifact, and failure reason."
+              "Created update attempts, status, artifact, delivery method, and failure reason."
             )}
           </CardDescription>
         </CardHeader>
@@ -281,6 +281,10 @@ export function UpdatesPage({
               {
                 header: t("updates.column.status", undefined, "Status"),
                 cell: (item) => <StatusBadge value={item.status} />,
+              },
+              {
+                header: t("updates.column.delivery", undefined, "Delivery"),
+                cell: (item) => human(item.delivery || item.deliveryDetail, t),
               },
               {
                 header: t("updates.column.failure", undefined, "Failure"),

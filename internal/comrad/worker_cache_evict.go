@@ -33,6 +33,10 @@ func (w *Worker) evictArtifact(payload EvictArtifactPayload) error {
 	for _, proc := range plan.procs {
 		proc.stop()
 	}
+	if w.p2p != nil {
+		w.p2p.StopSeeding(artifactID)
+		w.refreshP2PState()
+	}
 	if plan.path != "" {
 		if err := os.Remove(plan.path); err != nil && !os.IsNotExist(err) {
 			w.sendArtifactState(ArtifactSpec{ID: artifactID}, "evict_failed", err.Error())
@@ -91,6 +95,7 @@ func (w *Worker) applyArtifactEviction(artifactID string, plan artifactEvictionP
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	delete(w.cache, artifactID)
+	delete(w.cacheState, artifactID)
 	for _, key := range plan.profiles {
 		delete(w.assigns, key)
 		delete(w.warm, key)

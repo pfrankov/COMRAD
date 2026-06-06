@@ -25,6 +25,19 @@ export type DownloadPressure = {
   queued?: number
 }
 
+export type WorkerP2PStatus = {
+  available?: boolean
+  port?: number
+  maxUploads?: number
+  downloadTimeoutSeconds?: number
+  seedingCount?: number
+  downloadingCount?: number
+  peers?: number
+  fallbackCount?: number
+  lastFailure?: string
+  lastFailureAt?: string
+}
+
 export type Node = {
   nodeId: string
   ownerUserId?: string
@@ -39,6 +52,7 @@ export type Node = {
   runtimeAdapters?: string[]
   budgets?: ResourceBudget
   downloadPressure?: DownloadPressure
+  p2p?: WorkerP2PStatus
   cachedArtifacts?: string[]
   warmProfiles?: string[]
   lastSeen?: string
@@ -86,6 +100,12 @@ export type Artifact = {
   name?: string
   sha256?: string
   sizeBytes?: number
+  torrent?: {
+    infoHash?: string
+    magnetUri?: string
+    pieceLength?: number
+    metainfoPath?: string
+  }
 }
 
 export type ArtifactEvictionRecord = {
@@ -419,6 +439,8 @@ export type UpdateRecord = {
   kind?: string
   version?: string
   artifactId?: string
+  delivery?: string
+  deliveryDetail?: string
   status?: string
   failure?: string
 }

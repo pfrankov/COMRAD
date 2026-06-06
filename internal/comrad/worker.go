@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/anacrolix/torrent"
 	"github.com/gorilla/websocket"
 )
 
@@ -32,7 +33,12 @@ type WorkerConfig struct {
 	VRAMBytes              int64
 	UnifiedBytes           int64
 	DiskBytes              int64
+	P2PPort                int
+	P2PMaxUploads          int
+	P2PDownloadTimeout     time.Duration
 	EnableSelfUpdate       bool
+	p2pClientConfigHook    func(*torrent.ClientConfig)
+	p2pFactory             func(WorkerConfig) (workerP2PRuntime, *WorkerP2PStatus, error)
 }
 
 type Worker struct {
@@ -43,6 +49,7 @@ type Worker struct {
 	slots             map[string]Slot
 	assigns           map[string]AssignmentPayload
 	cache             map[string]string
+	cacheState        map[string]cachedArtifactState
 	warm              map[string]WorkloadProfile
 	activeAssignments map[string]bool
 	processed         map[string]time.Time
@@ -51,16 +58,23 @@ type Worker struct {
 	runtimeRestarts   map[string]int
 	downloadTokens    chan struct{}
 	downloadPressure  DownloadPressure
+	p2p               workerP2PRuntime
 	conn              *websocket.Conn
 	send              chan Envelope
 	mu                sync.Mutex
 }
 
+type cachedArtifactState struct {
+	Path    string           `json:"path"`
+	Torrent *ArtifactTorrent `json:"torrent,omitempty"`
+}
+
 type workerStateFile struct {
-	NodeID      string            `json:"nodeId"`
-	NodeToken   string            `json:"nodeToken,omitempty"`
-	Cache       map[string]string `json:"cache"`
-	WarmProfile []string          `json:"warmProfiles"`
+	NodeID          string                         `json:"nodeId"`
+	NodeToken       string                         `json:"nodeToken,omitempty"`
+	Cache           map[string]string              `json:"cache,omitempty"`
+	CachedArtifacts map[string]cachedArtifactState `json:"cachedArtifacts,omitempty"`
+	WarmProfile     []string                       `json:"warmProfiles"`
 }
 
 func NewWorker(cfg WorkerConfig) (*Worker, error) {
@@ -83,6 +97,7 @@ func NewWorker(cfg WorkerConfig) (*Worker, error) {
 		slots:             newWorkerSlots(cfg, target, adapters),
 		assigns:           map[string]AssignmentPayload{},
 		cache:             state.Cache,
+		cacheState:        state.CachedArtifacts,
 		warm:              map[string]WorkloadProfile{},
 		activeAssignments: map[string]bool{},
 		processed:         map[string]time.Time{},
@@ -96,6 +111,12 @@ func NewWorker(cfg WorkerConfig) (*Worker, error) {
 	if w.cache == nil {
 		w.cache = map[string]string{}
 	}
+	if w.cacheState == nil {
+		w.cacheState = map[string]cachedArtifactState{}
+	}
+	if err := w.initP2P(); err != nil {
+		return nil, err
+	}
 	if err := w.saveState(); err != nil {
 		return nil, err
 	}
@@ -103,6 +124,15 @@ func NewWorker(cfg WorkerConfig) (*Worker, error) {
 }
 
 func applyWorkerDefaults(cfg *WorkerConfig) {
+	applyWorkerConnectionDefaults(cfg)
+	applyWorkerCapacityDefaults(cfg)
+	applyWorkerP2PDefaults(cfg)
+	if cfg.RuntimeStartWait <= 0 {
+		cfg.RuntimeStartWait = 60 * time.Second
+	}
+}
+
+func applyWorkerConnectionDefaults(cfg *WorkerConfig) {
 	if cfg.ManagerURL == "" {
 		cfg.ManagerURL = "http://127.0.0.1:1922"
 	}
@@ -115,6 +145,9 @@ func applyWorkerDefaults(cfg *WorkerConfig) {
 	if cfg.CacheDir == "" {
 		cfg.CacheDir = "data/worker-cache"
 	}
+}
+
+func applyWorkerCapacityDefaults(cfg *WorkerConfig) {
 	if cfg.SlotCount <= 0 {
 		cfg.SlotCount = 1
 	}
@@ -130,15 +163,35 @@ func applyWorkerDefaults(cfg *WorkerConfig) {
 	if cfg.DiskBytes <= 0 {
 		cfg.DiskBytes = 20 << 30
 	}
-	if cfg.RuntimeStartWait <= 0 {
-		cfg.RuntimeStartWait = 60 * time.Second
+}
+
+func applyWorkerP2PDefaults(cfg *WorkerConfig) {
+	if cfg.P2PPort <= 0 {
+		cfg.P2PPort = defaultWorkerP2PPort
+	}
+	if cfg.P2PMaxUploads <= 0 {
+		cfg.P2PMaxUploads = defaultWorkerP2PMaxUploads
+	}
+	if cfg.P2PDownloadTimeout <= 0 {
+		cfg.P2PDownloadTimeout = defaultWorkerP2PDownloadTimeout
 	}
 }
 
 func loadWorkerState(path string) workerStateFile {
-	state := workerStateFile{Cache: map[string]string{}}
+	state := workerStateFile{Cache: map[string]string{}, CachedArtifacts: map[string]cachedArtifactState{}}
 	if b, err := os.ReadFile(path); err == nil && len(b) > 0 {
 		_ = json.Unmarshal(b, &state)
+	}
+	if len(state.CachedArtifacts) == 0 && len(state.Cache) > 0 {
+		for id, path := range state.Cache {
+			state.CachedArtifacts[id] = cachedArtifactState{Path: path}
+		}
+	}
+	if len(state.Cache) == 0 && len(state.CachedArtifacts) > 0 {
+		state.Cache = map[string]string{}
+		for id, entry := range state.CachedArtifacts {
+			state.Cache[id] = entry.Path
+		}
 	}
 	return state
 }
@@ -200,6 +253,7 @@ func firstRuntimeAdapter(adapters []string) string {
 
 func (w *Worker) Run(ctx context.Context) error {
 	defer w.stopAllRuntimeServers()
+	defer w.closeP2P()
 	backoff := time.Second
 	for {
 		select {
@@ -324,6 +378,7 @@ func (w *Worker) enqueue(msg Envelope) bool {
 }
 
 func (w *Worker) sendHello() {
+	w.refreshP2PState()
 	w.mu.Lock()
 	node := w.node
 	nodeToken := w.nodeToken
@@ -336,6 +391,7 @@ func (w *Worker) sendHello() {
 }
 
 func (w *Worker) sendFullState() {
+	w.refreshP2PState()
 	w.mu.Lock()
 	node := w.node
 	nodeToken := w.nodeToken

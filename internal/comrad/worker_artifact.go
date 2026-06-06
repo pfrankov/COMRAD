@@ -11,25 +11,31 @@ import (
 )
 
 func (w *Worker) ensureArtifact(ctx context.Context, artifact ArtifactSpec) error {
-	return w.ensureArtifactWithStart(ctx, artifact, nil)
+	_, err := w.ensureArtifactDetailed(ctx, artifact, nil)
+	return err
 }
 
 func (w *Worker) ensureArtifactWithStart(ctx context.Context, artifact ArtifactSpec, onStart func()) error {
+	_, err := w.ensureArtifactDetailed(ctx, artifact, onStart)
+	return err
+}
+
+func (w *Worker) ensureArtifactDetailed(ctx context.Context, artifact ArtifactSpec, onStart func()) (artifactDownloadResult, error) {
 	if artifact.ID == "" || artifact.URL == "" {
-		return errors.New("artifact spec missing id or url")
+		return artifactDownloadResult{}, errors.New("artifact spec missing id or url")
 	}
 	if w.artifactAlreadyCached(artifact) {
-		return nil
+		return artifactDownloadResult{}, nil
 	}
 	w.sendArtifactState(artifact, "download_queued", "")
 	release, err := w.acquireDownloadSlot(ctx)
 	if err != nil {
 		w.sendArtifactState(artifact, "download_failed", err.Error())
-		return err
+		return artifactDownloadResult{}, err
 	}
 	defer release()
 	if w.artifactAlreadyCached(artifact) {
-		return nil
+		return artifactDownloadResult{}, nil
 	}
 	w.sendArtifactState(artifact, "downloading", "")
 	if onStart != nil {
@@ -38,25 +44,91 @@ func (w *Worker) ensureArtifactWithStart(ctx context.Context, artifact ArtifactS
 	return w.downloadArtifact(ctx, artifact)
 }
 
-func (w *Worker) downloadArtifact(ctx context.Context, artifact ArtifactSpec) error {
+func (w *Worker) downloadArtifact(ctx context.Context, artifact ArtifactSpec) (artifactDownloadResult, error) {
 	target := filepath.Join(w.cfg.CacheDir, safeArtifactFileName(artifact.ID))
+	if result, err := w.downloadArtifactWithTorrent(ctx, artifact, target); err == nil {
+		if result.Method != "" {
+			return result, nil
+		}
+	} else if result.Method != "" {
+		if httpResult, httpErr := w.downloadArtifactWithHTTP(ctx, artifact, target); httpErr == nil {
+			return httpResult, nil
+		} else {
+			return artifactDownloadResult{}, httpErr
+		}
+	}
+	result, err := w.downloadArtifactWithHTTP(ctx, artifact, target)
+	if err != nil {
+		return artifactDownloadResult{}, err
+	}
+	return result, nil
+}
+
+func (w *Worker) downloadArtifactWithTorrent(ctx context.Context, artifact ArtifactSpec, target string) (artifactDownloadResult, error) {
+	if w.p2p == nil || artifact.Torrent == nil {
+		return artifactDownloadResult{}, nil
+	}
+	torrentCtx, cancel := context.WithTimeout(ctx, w.cfg.P2PDownloadTimeout)
+	defer cancel()
+	if err := w.p2p.Download(torrentCtx, artifact, target); err != nil {
+		reason := p2pFailureDownload
+		if downloadErr, ok := err.(*p2pDownloadError); ok {
+			reason = downloadErr.reason
+		}
+		w.p2p.RecordFallback(reason, err)
+		w.refreshP2PState()
+		return artifactDownloadResult{Method: artifactDeliveryHTTPFallback}, err
+	}
+	if err := VerifyFileSHA256(target, artifact.SHA256); err != nil {
+		if w.p2p != nil {
+			w.p2p.StopSeeding(artifact.ID)
+		}
+		_ = os.Remove(target)
+		w.p2p.RecordFallback(FailureArtifactDigestMismatch, err)
+		w.refreshP2PState()
+		return artifactDownloadResult{Method: artifactDeliveryHTTPFallback}, err
+	}
+	w.mu.Lock()
+	w.cache[artifact.ID] = target
+	w.cacheState[artifact.ID] = cachedArtifactState{Path: target, Torrent: cloneArtifactTorrent(artifact.Torrent)}
+	w.mu.Unlock()
+	w.sendArtifactState(artifact, "verified", "")
+	w.refreshP2PState()
+	if err := w.saveState(); err != nil {
+		return artifactDownloadResult{}, err
+	}
+	return artifactDownloadResult{Method: artifactDeliveryTorrent}, nil
+}
+
+func (w *Worker) downloadArtifactWithHTTP(ctx context.Context, artifact ArtifactSpec, target string) (artifactDownloadResult, error) {
 	resp, err := w.openArtifactResponse(ctx, artifact)
 	if err != nil {
-		return err
+		return artifactDownloadResult{}, err
 	}
 	defer resp.Body.Close()
 	if err := validArtifactResponse(resp); err != nil {
 		w.sendArtifactState(artifact, "download_failed", err.Error())
-		return err
+		return artifactDownloadResult{}, err
 	}
 	if err := w.writeArtifactFile(resp.Body, target, artifact); err != nil {
-		return err
+		return artifactDownloadResult{}, err
 	}
 	w.mu.Lock()
 	w.cache[artifact.ID] = target
+	w.cacheState[artifact.ID] = cachedArtifactState{Path: target, Torrent: cloneArtifactTorrent(artifact.Torrent)}
 	w.mu.Unlock()
+	if err := w.seedCachedArtifact(artifact, target); err != nil {
+		return artifactDownloadResult{}, err
+	}
 	w.sendArtifactState(artifact, "verified", "")
-	return nil
+	w.refreshP2PState()
+	if err := w.saveState(); err != nil {
+		return artifactDownloadResult{}, err
+	}
+	if artifact.Torrent != nil {
+		return artifactDownloadResult{Method: artifactDeliveryHTTPFallback}, nil
+	}
+	return artifactDownloadResult{Method: artifactDeliveryHTTPOnly}, nil
 }
 
 func (w *Worker) artifactAlreadyCached(artifact ArtifactSpec) bool {
@@ -67,10 +139,22 @@ func (w *Worker) artifactAlreadyCached(artifact ArtifactSpec) bool {
 		return false
 	}
 	if err := VerifyFileSHA256(existing, artifact.SHA256); err == nil {
+		w.mu.Lock()
+		w.cacheState[artifact.ID] = cachedArtifactState{Path: existing, Torrent: cloneArtifactTorrent(artifact.Torrent)}
+		w.mu.Unlock()
+		_ = w.seedCachedArtifact(artifact, existing)
 		w.sendArtifactState(artifact, "verified", "")
 		return true
 	}
+	if w.p2p != nil {
+		w.p2p.StopSeeding(artifact.ID)
+		w.refreshP2PState()
+	}
 	_ = os.Remove(existing)
+	w.mu.Lock()
+	delete(w.cache, artifact.ID)
+	delete(w.cacheState, artifact.ID)
+	w.mu.Unlock()
 	return false
 }
 

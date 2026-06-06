@@ -13,8 +13,15 @@ func TestStoreSnapshotDeepCopiesMutableFields(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	if err := store.Update(func(db *Database) error {
-		db.Nodes["node-a"] = Node{ID: "node-a", Tags: []string{"fast"}, CachedArtifacts: []string{"sha256:a"}, ConnectedSession: "session-a"}
+		db.Nodes["node-a"] = Node{
+			ID:               "node-a",
+			Tags:             []string{"fast"},
+			P2P:              &WorkerP2PStatus{Available: true, Port: 6881, LastFailureAt: &now},
+			CachedArtifacts:  []string{"sha256:a"},
+			ConnectedSession: "session-a",
+		}
 		db.Slots["slot-a"] = Slot{ID: "slot-a", FailureCounters: map[string]int{"runtime": 1}, LastFailureAt: &now}
+		db.Artifacts["sha256:a"] = Artifact{ID: "sha256:a", Torrent: &ArtifactTorrent{InfoHash: "sha1:abc", MetaInfoBytes: []byte("torrent")}}
 		db.CacheIntents["cache-a"] = CacheIntentRecord{ID: "cache-a", NodeID: "node-a", ArtifactID: "sha256:a", Action: CacheIntentKeep}
 		db.Profiles["profile-a"] = WorkloadProfile{
 			ID:           "profile-a",
@@ -42,8 +49,10 @@ func TestStoreSnapshotDeepCopiesMutableFields(t *testing.T) {
 
 	snapshot := store.Snapshot()
 	snapshot.Nodes["node-a"].Tags[0] = "mutated"
+	snapshot.Nodes["node-a"].P2P.Port = 1
 	snapshot.Nodes["node-a"].CachedArtifacts[0] = "sha256:mutated"
 	snapshot.Slots["slot-a"].FailureCounters["runtime"] = 9
+	snapshot.Artifacts["sha256:a"].Torrent.MetaInfoBytes[0] = 'x'
 	snapshot.CacheIntents["cache-a"] = CacheIntentRecord{ID: "cache-a", Action: "mutated"}
 	snapshot.Profiles["profile-a"].Artifacts[0] = "sha256:mutated"
 	snapshot.Profiles["profile-a"].Requirements.RequireTags[0] = "mutated"
@@ -60,8 +69,10 @@ func TestStoreSnapshotDeepCopiesMutableFields(t *testing.T) {
 		t.Fatalf("snapshot exposed connected session: %+v", fresh.Nodes["node-a"])
 	}
 	if fresh.Nodes["node-a"].Tags[0] != "fast" ||
+		fresh.Nodes["node-a"].P2P.Port != 6881 ||
 		fresh.Nodes["node-a"].CachedArtifacts[0] != "sha256:a" ||
 		fresh.Slots["slot-a"].FailureCounters["runtime"] != 1 ||
+		string(fresh.Artifacts["sha256:a"].Torrent.MetaInfoBytes) != "torrent" ||
 		fresh.CacheIntents["cache-a"].Action != CacheIntentKeep ||
 		fresh.Profiles["profile-a"].Artifacts[0] != "sha256:a" ||
 		fresh.Profiles["profile-a"].Requirements.RequireTags[0] != "fast" ||

@@ -186,6 +186,11 @@ function NodeCard({
             )}
             value={formatDownloadPressure(node, t)}
           />
+          <ResourceStat
+            icon={ActivityIcon}
+            label={t("nodes.metric.p2p", undefined, "P2P runtime")}
+            value={formatP2PRuntime(node, t)}
+          />
         </div>
         {node.warmPlacementSuppressed ? (
           <div className="rounded-lg border bg-muted/50 p-3">
@@ -294,6 +299,27 @@ function NodeTechnicalDetailsDialog({
             [
               t("nodes.field.downloadPressure", undefined, "Download pressure"),
               formatDownloadPressure(node, t),
+            ],
+            [t("nodes.field.p2p", undefined, "P2P runtime"), formatP2PRuntime(node, t)],
+            [
+              t("nodes.field.p2pSeeders", undefined, "P2P seeding"),
+              String(node.p2p?.seedingCount ?? 0),
+            ],
+            [
+              t("nodes.field.p2pDownloads", undefined, "P2P downloading"),
+              String(node.p2p?.downloadingCount ?? 0),
+            ],
+            [
+              t("nodes.field.p2pPeers", undefined, "P2P peers"),
+              String(node.p2p?.peers ?? 0),
+            ],
+            [
+              t("nodes.field.p2pFallbacks", undefined, "P2P fallbacks"),
+              String(node.p2p?.fallbackCount ?? 0),
+            ],
+            [
+              t("nodes.field.p2pLastFailure", undefined, "P2P last failure"),
+              node.p2p?.lastFailure || "-",
             ],
             [
               t(
@@ -625,6 +651,22 @@ function formatDownloadPressure(node: Node, t: TFunction) {
     "nodes.metric.downloadPressure.value",
     { active, max, queued },
     `${active}/${max} active, ${queued} queued`
+  )
+}
+
+function formatP2PRuntime(node: Node, t: TFunction) {
+  if (!node.p2p) return "-"
+  if (!node.p2p.available) {
+    return t("nodes.metric.p2p.unavailable", undefined, "Unavailable")
+  }
+  return t(
+    "nodes.metric.p2p.value",
+    {
+      seeders: node.p2p.seedingCount ?? 0,
+      downloads: node.p2p.downloadingCount ?? 0,
+      peers: node.p2p.peers ?? 0,
+    },
+    `${node.p2p.seedingCount ?? 0} seeding, ${node.p2p.downloadingCount ?? 0} downloading, ${node.p2p.peers ?? 0} peers`
   )
 }
 

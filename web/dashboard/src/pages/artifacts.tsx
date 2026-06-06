@@ -1,6 +1,5 @@
 import { PlusIcon, Trash2Icon } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -33,7 +32,7 @@ export function ArtifactsPage({
         description={t(
           "artifacts.description",
           undefined,
-          "Verified artifacts cached by Workers and used by models."
+          "Verified artifacts cached by Workers, announced over public BitTorrent when possible, and used by models."
         )}
         actions={
           <Button onClick={() => actions.show("profiles")}>
@@ -79,6 +78,32 @@ export function ArtifactsPage({
                 cell: (artifact) => <code>{short(artifact.sha256)}</code>,
               },
               {
+                header: t("artifacts.column.infoHash", undefined, "Info hash"),
+                cell: (artifact) => (
+                  <code title={artifact.torrent?.infoHash}>
+                    {short(artifact.torrent?.infoHash)}
+                  </code>
+                ),
+              },
+              {
+                header: t("artifacts.column.seeders", undefined, "Seeders"),
+                cell: (artifact) => currentSeeders(artifact, state),
+              },
+              {
+                header: t("artifacts.column.magnet", undefined, "Magnet"),
+                cell: (artifact) =>
+                  artifact.torrent?.magnetUri ? (
+                    <code
+                      className="block max-w-[280px] truncate"
+                      title={artifact.torrent.magnetUri}
+                    >
+                      {artifact.torrent.magnetUri}
+                    </code>
+                  ) : (
+                    "-"
+                  ),
+              },
+              {
                 header: t(
                   "artifacts.column.cachedWorkers",
                   undefined,
@@ -117,18 +142,6 @@ export function ArtifactsPage({
           />
         </CardContent>
       </Card>
-      <Alert>
-        <AlertTitle>
-          {t("artifacts.p2p.title", undefined, "P2P is not implemented yet")}
-        </AlertTitle>
-        <AlertDescription>
-          {t(
-            "artifacts.p2p.description",
-            undefined,
-            "Current delivery is Manager to Worker over authenticated artifact URLs. There is no enable switch in this build; P2P requires a delivery subsystem before these peer metrics can exist."
-          )}
-        </AlertDescription>
-      </Alert>
     </>
   )
 }
@@ -170,6 +183,15 @@ function cachedNodes(artifact: Artifact, state: StateResponse) {
       .filter((node) => node.cachedArtifacts?.includes(artifact.artifactId))
       .map((node) => short(node.nodeId))
       .join(", ") || "-"
+  )
+}
+
+function currentSeeders(artifact: Artifact, state: StateResponse) {
+  return String(
+    (state.nodes ?? []).filter(
+      (node) =>
+        node.p2p?.available && node.cachedArtifacts?.includes(artifact.artifactId)
+    ).length
   )
 }
 

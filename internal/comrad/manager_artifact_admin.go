@@ -63,7 +63,7 @@ func (m *Manager) receiveUploadedArtifact(r *http.Request) (Artifact, error) {
 	if err != nil {
 		return Artifact{}, err
 	}
-	return finalizeUploadedArtifact(tmp, name, r.FormValue("kind"), r.FormValue("sha256"))
+	return finalizeUploadedArtifact(tmp, name, r.FormValue("kind"), r.FormValue("sha256"), m.cfg.ArtifactDir)
 }
 
 func (m *Manager) storeUploadedArtifact(artifact Artifact) error {
@@ -128,10 +128,27 @@ func artifactDeleteBlocker(db *Database, id string) string {
 }
 
 func (m *Manager) removeManagedArtifactFile(artifact Artifact) error {
+	if err := removeManagedMetainfoFile(artifact, m.cfg.ArtifactDir); err != nil {
+		return err
+	}
 	if !pathInsideDir(artifact.Path, m.cfg.ArtifactDir) {
 		return nil
 	}
 	err := os.Remove(artifact.Path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
+func removeManagedMetainfoFile(artifact Artifact, artifactDir string) error {
+	if artifact.Torrent == nil || artifact.Torrent.MetaInfoPath == "" {
+		return nil
+	}
+	if !pathInsideDir(artifact.Torrent.MetaInfoPath, artifactDir) {
+		return nil
+	}
+	err := os.Remove(artifact.Torrent.MetaInfoPath)
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -176,7 +193,7 @@ func copyUploadToArtifactDir(file io.Reader, dir string) (string, error) {
 	return tmp, nil
 }
 
-func finalizeUploadedArtifact(tmp, name, kind, expected string) (Artifact, error) {
+func finalizeUploadedArtifact(tmp, name, kind, expected, artifactDir string) (Artifact, error) {
 	sha, size, err := FileSHA256(tmp)
 	if err != nil {
 		_ = os.Remove(tmp)
@@ -193,7 +210,15 @@ func finalizeUploadedArtifact(tmp, name, kind, expected string) (Artifact, error
 	if kind == "" {
 		kind = inferArtifactKind(name)
 	}
-	return Artifact{ID: "sha256:" + strings.TrimPrefix(sha, "sha256:"), Kind: kind, Name: name, Path: final, SHA256: sha, SizeBytes: size, CreatedAt: time.Now().UTC()}, nil
+	return ensureArtifactTorrentMetadata(Artifact{
+		ID:        "sha256:" + strings.TrimPrefix(sha, "sha256:"),
+		Kind:      kind,
+		Name:      name,
+		Path:      final,
+		SHA256:    sha,
+		SizeBytes: size,
+		CreatedAt: time.Now().UTC(),
+	}, artifactDir)
 }
 
 func moveUploadIntoPlace(tmp, final string) error {

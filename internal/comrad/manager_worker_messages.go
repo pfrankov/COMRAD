@@ -3,7 +3,6 @@ package comrad
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -186,7 +185,24 @@ func handleWorkerAck(m *Manager, s *workerSession, msg Envelope) error {
 }
 
 func handleWorkerTelemetry(m *Manager, s *workerSession, msg Envelope) error {
-	return m.store.Audit("worker.telemetry", "worker", s.nodeID, map[string]any{"messageId": msg.ID})
+	if len(msg.Payload) == 0 {
+		return m.store.Audit("worker.telemetry", "worker", s.nodeID, map[string]any{"messageId": msg.ID})
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		return err
+	}
+	if updateID := payload["updateId"]; updateID != "" {
+		if err := m.recordWorkerUpdateTelemetry(s.nodeID, updateID, payload["status"], payload["detail"]); err != nil {
+			return err
+		}
+	}
+	return m.store.Audit("worker.telemetry", "worker", s.nodeID, map[string]any{
+		"messageId": msg.ID,
+		"updateId":  payload["updateId"],
+		"status":    payload["status"],
+		"detail":    payload["detail"],
+	})
 }
 
 func (m *Manager) upsertWorkerState(s *workerSession, node Node, slots []Slot, cached []string, warm []string, nodeToken string) error {
@@ -427,27 +443,4 @@ func (m *Manager) handleComputeReport(nodeID string, report ComputeReport) error
 	}
 	m.replanAndDispatch()
 	return nil
-}
-
-func (m *Manager) dispatchUpdate(update UpdateRecord) {
-	db := m.store.Snapshot()
-	targets := update.TargetNodes
-	if len(targets) == 0 {
-		for id := range db.Nodes {
-			targets = append(targets, id)
-		}
-	}
-	for _, nodeID := range targets {
-		m.mu.Lock()
-		sess := m.sessions[nodeID]
-		m.mu.Unlock()
-		if sess == nil {
-			continue
-		}
-		payload := UpdatePayload{Update: update}
-		if art, ok := db.Artifacts[update.ArtifactID]; ok {
-			payload.URL = strings.TrimRight(sess.baseURL, "/") + "/api/worker/artifacts/" + art.ID
-		}
-		sess.enqueue(Envelope{ID: NewID("msg"), Type: MsgUpdateWorker, NodeID: nodeID, Payload: MarshalPayload(payload)})
-	}
 }
