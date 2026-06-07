@@ -662,5 +662,13 @@
   "nodes.metric.p2p": "P2P-сеть",
   "nodes.metric.p2p.unavailable": "Недоступно",
   "nodes.metric.p2p.value": "{seeders} раздают, {downloads} скачивают, {peers} пиров",
-  "updates.column.delivery": "Доставка"
+  "updates.column.delivery": "Доставка",
+  "settings.p2p.title": "BitTorrent / P2P",
+  "settings.p2p.description": "Когда включено, воркеры скачивают артефакты друг у друга через BitTorrent. Когда выключено, все загрузки идут через менеджер по HTTP.",
+  "settings.p2p.enabled": "Включено",
+  "settings.p2p.disabled": "Выключено",
+  "settings.p2p.status": "Активно",
+  "settings.p2p.statusOff": "Выключено",
+  "settings.p2p.saveFailed": "Не удалось обновить настройку P2P",
+  "settings.p2p.saved": "Настройка P2P обновлена"
 }

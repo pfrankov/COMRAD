@@ -31,6 +31,7 @@ func (m *Manager) stateResponse() StateResponse {
 	return StateResponse{
 		Version:           Version,
 		SchemaVersion:     db.SchemaVersion,
+		Settings:          db.Settings,
 		Nodes:             SortedNodes(db),
 		Slots:             SortedSlots(db),
 		Artifacts:         adminArtifacts(db),

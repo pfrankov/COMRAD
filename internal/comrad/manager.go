@@ -264,6 +264,7 @@ func (m *Manager) Handler() http.Handler {
 	mux.HandleFunc("/api/admin/metrics", m.adminOnly(m.handleAdminMetrics))
 	mux.HandleFunc("/api/admin/worker-join", m.adminOnly(m.handleAdminWorkerJoin))
 	mux.HandleFunc("/api/admin/config.yaml", m.adminOnly(m.handleAdminConfigYAML))
+	mux.HandleFunc("/api/admin/settings", m.adminOnly(m.handleAdminSettings))
 	mux.HandleFunc("/api/admin/openapi.json", m.adminOnly(m.handleOpenAPIJSON))
 	mux.HandleFunc("/api/admin/docs", m.adminTicketOrBearer(m.handleOpenAPIDocs))
 	mux.HandleFunc("/api/worker/ws", m.handleWorkerWS)

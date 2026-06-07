@@ -8,11 +8,12 @@ import (
 	"time"
 )
 
-const CurrentSchemaVersion = 2
+const CurrentSchemaVersion = 3
 
 type Database struct {
 	SchemaVersion     int                               `json:"schemaVersion"`
 	Migrations        []string                          `json:"migrations"`
+	Settings          GlobalSettings                    `json:"settings"`
 	Nodes             map[string]Node                   `json:"nodes"`
 	Slots             map[string]Slot                   `json:"slots"`
 	Artifacts         map[string]Artifact               `json:"artifacts"`
@@ -30,6 +31,10 @@ type Database struct {
 	NodeTokenHashes   map[string]string                 `json:"nodeTokenHashes,omitempty"`
 	ComputeLedger     []ComputeLedgerEntry              `json:"computeLedger"`
 	Audit             []AuditEvent                      `json:"audit"`
+}
+
+type GlobalSettings struct {
+	P2PEnabled bool `json:"p2pEnabled"`
 }
 
 type Store struct {
@@ -71,7 +76,7 @@ func openStoreWithBackend(backend storeBackend) (*Store, error) {
 }
 
 func emptyDatabase() Database {
-	db := Database{SchemaVersion: CurrentSchemaVersion}
+	db := Database{SchemaVersion: CurrentSchemaVersion, Settings: GlobalSettings{P2PEnabled: true}}
 	ensureMaps(&db)
 	db.Migrations = append(db.Migrations, fmt.Sprintf("schema_%d", CurrentSchemaVersion))
 	return db
@@ -147,6 +152,9 @@ func (s *Store) migrateLocked() error {
 	}
 	if s.db.SchemaVersion == CurrentSchemaVersion {
 		return nil
+	}
+	if s.db.SchemaVersion < 3 {
+		s.db.Settings = GlobalSettings{P2PEnabled: true}
 	}
 	s.db.SchemaVersion = CurrentSchemaVersion
 	s.db.Migrations = append(s.db.Migrations, fmt.Sprintf("schema_%d", CurrentSchemaVersion))

@@ -226,22 +226,26 @@ func (m *Manager) replanAndDispatch() {
 
 func (m *Manager) artifactSpecs(profile WorkloadProfile, baseURL string) []ArtifactSpec {
 	db := m.store.Snapshot()
+	p2pEnabled := db.Settings.P2PEnabled
 	specs := []ArtifactSpec{}
 	for _, id := range profile.Artifacts {
 		artifact, ok := db.Artifacts[id]
 		if !ok {
 			continue
 		}
-		specs = append(specs, ArtifactSpec{
+		spec := ArtifactSpec{
 			ID:        artifact.ID,
 			Kind:      artifact.Kind,
 			Name:      artifact.Name,
 			SHA256:    artifact.SHA256,
 			SizeBytes: artifact.SizeBytes,
 			URL:       strings.TrimRight(baseURL, "/") + "/api/worker/artifacts/" + artifact.ID,
-			Torrent:   cloneArtifactTorrent(artifact.Torrent),
-			P2PPeers:  m.peersForArtifact(db, id),
-		})
+		}
+		if p2pEnabled {
+			spec.Torrent = cloneArtifactTorrent(artifact.Torrent)
+			spec.P2PPeers = m.peersForArtifact(db, id)
+		}
+		specs = append(specs, spec)
 	}
 	return specs
 }

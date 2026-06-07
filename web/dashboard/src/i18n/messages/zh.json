@@ -662,5 +662,13 @@
   "nodes.metric.p2p": "P2P 运行时",
   "nodes.metric.p2p.unavailable": "不可用",
   "nodes.metric.p2p.value": "{seeders} 做种, {downloads} 下载中, {peers} 对等点",
-  "updates.column.delivery": "传输"
+  "updates.column.delivery": "传输",
+  "settings.p2p.title": "BitTorrent / P2P",
+  "settings.p2p.description": "启用时，工作节点通过 BitTorrent 互相下载工件。禁用时，所有下载通过管理器以 HTTP 方式进行。",
+  "settings.p2p.enabled": "已启用",
+  "settings.p2p.disabled": "已禁用",
+  "settings.p2p.status": "活跃",
+  "settings.p2p.statusOff": "已关闭",
+  "settings.p2p.saveFailed": "更新 P2P 设置失败",
+  "settings.p2p.saved": "P2P 设置已更新"
 }

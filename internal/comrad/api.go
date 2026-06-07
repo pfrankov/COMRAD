@@ -5,6 +5,7 @@ import "time"
 type StateResponse struct {
 	Version           string                   `json:"version"`
 	SchemaVersion     int                      `json:"schemaVersion"`
+	Settings          GlobalSettings           `json:"settings"`
 	Nodes             []Node                   `json:"nodes"`
 	Slots             []Slot                   `json:"slots"`
 	Artifacts         []Artifact               `json:"artifacts"`
@@ -225,4 +226,8 @@ type ErrorResponse struct {
 type ErrorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+type UpdateSettingsRequest struct {
+	P2PEnabled *bool `json:"p2pEnabled"`
 }

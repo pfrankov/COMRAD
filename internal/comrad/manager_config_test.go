@@ -1,6 +1,8 @@
 package comrad
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -72,6 +74,7 @@ func TestAdminConfigYAMLRedactsSecrets(t *testing.T) {
 		"workers:",
 		"connection: outboundWebSocket",
 		"p2p:",
+		"enabled: true",
 		"mode: bestEffortPublicBitTorrent",
 		"defaultPort: 6881",
 		"availableWorkers: 1",
@@ -88,5 +91,102 @@ func TestAdminConfigYAMLRedactsSecrets(t *testing.T) {
 		if strings.Contains(body, secret) {
 			t.Fatalf("config yaml leaked secret %q:\n%s", secret, body)
 		}
+	}
+}
+
+func TestAdminConfigYAMLShowsP2PDisabled(t *testing.T) {
+	manager, err := NewManager(ManagerConfig{
+		DBPath:      filepath.Join(t.TempDir(), "comrad.sqlite"),
+		ArtifactDir: filepath.Join(t.TempDir(), "artifacts"),
+		AdminToken:  "admin",
+		ClientAPIKey: "client",
+		WorkerToken: "worker",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.store.Update(func(db *Database) error {
+		db.Settings.P2PEnabled = false
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/api/admin/config.yaml", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer admin")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(bodyBytes)
+	if !strings.Contains(body, "enabled: false") {
+		t.Fatalf("config yaml should show p2p enabled=false:\n%s", body)
+	}
+	if strings.Contains(body, "bestEffortPublicBitTorrent") {
+		t.Fatalf("config yaml should not show p2p mode when disabled:\n%s", body)
+	}
+}
+
+func TestAdminSettingsEndpoint(t *testing.T) {
+	manager, err := NewManager(ManagerConfig{
+		DBPath:      filepath.Join(t.TempDir(), "comrad.sqlite"),
+		ArtifactDir: filepath.Join(t.TempDir(), "artifacts"),
+		AdminToken:  "admin",
+		ClientAPIKey: "client",
+		WorkerToken: "worker",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	getSettings := func() GlobalSettings {
+		req, _ := http.NewRequest(http.MethodGet, server.URL+"/api/admin/settings", nil)
+		req.Header.Set("Authorization", "Bearer admin")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var settings GlobalSettings
+		if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
+			t.Fatal(err)
+		}
+		return settings
+	}
+
+	settings := getSettings()
+	if !settings.P2PEnabled {
+		t.Fatal("default P2PEnabled should be true")
+	}
+
+	enabled := false
+	body, _ := json.Marshal(UpdateSettingsRequest{P2PEnabled: &enabled})
+	req, _ := http.NewRequest(http.MethodPost, server.URL+"/api/admin/settings", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer admin")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST settings status = %d", resp.StatusCode)
+	}
+
+	settings = getSettings()
+	if settings.P2PEnabled {
+		t.Fatal("P2PEnabled should be false after update")
 	}
 }

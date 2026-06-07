@@ -10,6 +10,7 @@ func cloneDatabase(db Database) Database {
 	return Database{
 		SchemaVersion:     db.SchemaVersion,
 		Migrations:        slices.Clone(db.Migrations),
+		Settings:          db.Settings,
 		Nodes:             cloneMapValues(db.Nodes, cloneNode),
 		Slots:             cloneMapValues(db.Slots, cloneSlot),
 		Artifacts:         cloneMapValues(db.Artifacts, cloneArtifact),

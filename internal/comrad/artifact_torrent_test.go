@@ -422,3 +422,94 @@ func TestMigrateArtifactTorrentMetadata(t *testing.T) {
 		t.Fatalf("artifact missing torrent metadata after migration: %+v", updated.Torrent)
 	}
 }
+
+func TestArtifactSpecsOmitTorrentWhenP2PDisabled(t *testing.T) {
+	manager, err := NewManager(ManagerConfig{
+		DBPath:       filepath.Join(t.TempDir(), "comrad.json"),
+		ArtifactDir:  filepath.Join(t.TempDir(), "artifacts"),
+		AdminToken:   "admin",
+		ClientAPIKey: "client",
+		WorkerToken:  "worker",
+		AutoApprove:  true,
+		QueueLimit:   2,
+		StreamWait:   time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := mustManagerArtifactWithTorrent(t, manager, "model.gguf", []byte("p2p disabled test"))
+	profile := WorkloadProfile{ID: "profile-p2p-off", Artifacts: []string{artifact.ID}}
+
+	if err := manager.store.Update(func(db *Database) error {
+		db.Settings.P2PEnabled = false
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	specs := manager.artifactSpecs(profile, "http://manager.test")
+	if len(specs) != 1 {
+		t.Fatalf("artifact specs len = %d, want 1", len(specs))
+	}
+	if specs[0].Torrent != nil {
+		t.Fatal("torrent metadata should be nil when P2P disabled")
+	}
+	if len(specs[0].P2PPeers) != 0 {
+		t.Fatalf("p2p peers should be empty when P2P disabled, got %v", specs[0].P2PPeers)
+	}
+	if specs[0].URL == "" {
+		t.Fatal("HTTP URL should still be populated")
+	}
+}
+
+func TestMigrateSkippedWhenP2PDisabled(t *testing.T) {
+	dir := t.TempDir()
+	manager, err := NewManager(ManagerConfig{
+		DBPath:       filepath.Join(dir, "comrad.json"),
+		ArtifactDir:  filepath.Join(dir, "artifacts"),
+		AdminToken:   "admin",
+		ClientAPIKey: "client",
+		WorkerToken:  "worker",
+		AutoApprove:  true,
+		QueueLimit:   2,
+		StreamWait:   time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	modelPath := filepath.Join(dir, "tiny.gguf")
+	if err := osWriteFile(modelPath, []byte("no torrent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sha, size, err := FileSHA256(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := Artifact{
+		ID:        "sha256:" + strings.TrimPrefix(sha, "sha256:"),
+		Kind:      "model_gguf",
+		Name:      "tiny.gguf",
+		Path:      modelPath,
+		SHA256:    sha,
+		SizeBytes: size,
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := manager.store.Update(func(db *Database) error {
+		db.Artifacts[artifact.ID] = artifact
+		db.Settings.P2PEnabled = false
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := manager.migrateArtifactTorrentMetadata(); err != nil {
+		t.Fatal(err)
+	}
+
+	db := manager.store.Snapshot()
+	updated := db.Artifacts[artifact.ID]
+	if updated.Torrent != nil {
+		t.Fatal("torrent metadata should not be generated when P2P disabled")
+	}
+}

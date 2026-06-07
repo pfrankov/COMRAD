@@ -445,8 +445,13 @@ export type UpdateRecord = {
   failure?: string
 }
 
+export type GlobalSettings = {
+  p2pEnabled?: boolean
+}
+
 export type StateResponse = {
   version?: string
+  settings?: GlobalSettings
   nodes?: Node[]
   slots?: Slot[]
   artifacts?: Artifact[]

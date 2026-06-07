@@ -445,3 +445,38 @@ func (m *Manager) handleAdminMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	writePrometheusMetrics(w, m.store.Snapshot(), len(m.queue), cap(m.queue), m.store.BackendName(), m.runtimeMetricsSnapshot())
 }
+
+func (m *Manager) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, m.store.Snapshot().Settings)
+	case http.MethodPost:
+		var req UpdateSettingsRequest
+		if err := readConfig(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		if err := m.store.Update(func(db *Database) error {
+			if req.P2PEnabled != nil {
+				db.Settings.P2PEnabled = *req.P2PEnabled
+			}
+			db.Audit = append(db.Audit, AuditEvent{
+				ID:        NewID("aud"),
+				Type:      "admin.settings.updated",
+				Actor:     "admin",
+				Subject:   "settings",
+				CreatedAt: time.Now().UTC(),
+			})
+			return nil
+		}); err != nil {
+			writeError(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		if req.P2PEnabled != nil {
+			m.replanAndDispatch()
+		}
+		writeJSON(w, http.StatusOK, m.store.Snapshot().Settings)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}

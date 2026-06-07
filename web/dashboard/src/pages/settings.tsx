@@ -6,6 +6,7 @@ import {
   KeyRoundIcon,
   MonitorIcon,
   MoonIcon,
+  NetworkIcon,
   RefreshCwIcon,
   SunIcon,
 } from "lucide-react"
@@ -62,7 +63,10 @@ export function SettingsPage({
           adminToken={adminToken}
           saveAdminToken={saveAdminToken}
         />
+        <P2PCard state={state} actions={actions} />
         <ThemeCard />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
         <LanguageCard />
       </div>
       <Card>
@@ -494,6 +498,81 @@ function AdminTokenCard({
             {t("shell.saveAdminToken")}
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+function P2PCard({
+  state,
+  actions,
+}: {
+  state: StateResponse
+  actions: Actions
+}) {
+  const { t } = useI18n()
+  const p2pEnabled = state.settings?.p2pEnabled ?? true
+  const [saving, setSaving] = useState(false)
+
+  const toggleP2P = async (enabled: boolean) => {
+    setSaving(true)
+    try {
+      await actions.api("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ p2pEnabled: enabled }),
+      })
+      toast.success(t("settings.p2p.saved"))
+    } catch (err) {
+      toast.error(
+        t("settings.p2p.saveFailed")
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <NetworkIcon data-icon="inline-start" />
+          {t("settings.p2p.title")}
+        </CardTitle>
+        <CardDescription>
+          {t("settings.p2p.description")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <ToggleGroup
+          type="single"
+          value={p2pEnabled ? "enabled" : "disabled"}
+          onValueChange={(value) => {
+            if (value && !saving) toggleP2P(value === "enabled")
+          }}
+          className="grid w-full grid-cols-2 rounded-full bg-muted p-1 sm:w-auto"
+          aria-label={t("settings.p2p.title")}
+        >
+          <ToggleGroupItem
+            value="enabled"
+            className="rounded-full px-3"
+            disabled={saving}
+          >
+            {t("settings.p2p.enabled")}
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="disabled"
+            className="rounded-full px-3"
+            disabled={saving}
+          >
+            {t("settings.p2p.disabled")}
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <div className="font-mono text-xs text-muted-foreground uppercase">
+          {p2pEnabled
+            ? t("settings.p2p.status")
+            : t("settings.p2p.statusOff")}
+        </div>
       </CardContent>
     </Card>
   )

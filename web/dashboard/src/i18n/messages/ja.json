@@ -662,5 +662,13 @@
   "nodes.metric.p2p": "P2P runtime",
   "nodes.metric.p2p.unavailable": "Unavailable",
   "nodes.metric.p2p.value": "{seeders} seeding, {downloads} downloading, {peers} peers",
-  "updates.column.delivery": "Delivery"
+  "updates.column.delivery": "Delivery",
+  "settings.p2p.title": "BitTorrent / P2P",
+  "settings.p2p.description": "When enabled, workers download artifacts from each other via BitTorrent. When disabled, all downloads go through the manager over HTTP.",
+  "settings.p2p.enabled": "Enabled",
+  "settings.p2p.disabled": "Disabled",
+  "settings.p2p.status": "Active",
+  "settings.p2p.statusOff": "Off",
+  "settings.p2p.saveFailed": "Failed to update P2P setting",
+  "settings.p2p.saved": "P2P setting updated"
 }

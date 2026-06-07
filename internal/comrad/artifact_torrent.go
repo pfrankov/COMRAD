@@ -66,6 +66,9 @@ func writeArtifactMetaInfoFile(artifactDir, artifactID string, body []byte) (str
 }
 
 func (m *Manager) migrateArtifactTorrentMetadata() error {
+	if !m.store.Snapshot().Settings.P2PEnabled {
+		return nil
+	}
 	return m.store.Update(func(db *Database) error {
 		for id, artifact := range db.Artifacts {
 			if artifact.Torrent != nil && artifact.Torrent.InfoHash != "" && len(artifact.Torrent.MetaInfoBytes) > 0 {

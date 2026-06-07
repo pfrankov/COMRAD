@@ -65,13 +65,14 @@ type WorkersConfigYAML struct {
 }
 
 type WorkerP2PConfigYAML struct {
-	Mode                            string  `yaml:"mode"`
-	Discovery                       string  `yaml:"discovery"`
-	DefaultPort                     int     `yaml:"defaultPort"`
-	DefaultMaxUploads               int     `yaml:"defaultMaxUploads"`
-	DefaultDownloadTimeoutSeconds   int64   `yaml:"defaultDownloadTimeoutSeconds"`
-	AvailableWorkers                int     `yaml:"availableWorkers"`
-	ReportingWorkers                int     `yaml:"reportingWorkers"`
+	Enabled                         bool    `yaml:"enabled"`
+	Mode                            string  `yaml:"mode,omitempty"`
+	Discovery                       string  `yaml:"discovery,omitempty"`
+	DefaultPort                     int     `yaml:"defaultPort,omitempty"`
+	DefaultMaxUploads               int     `yaml:"defaultMaxUploads,omitempty"`
+	DefaultDownloadTimeoutSeconds   int64   `yaml:"defaultDownloadTimeoutSeconds,omitempty"`
+	AvailableWorkers                int     `yaml:"availableWorkers,omitempty"`
+	ReportingWorkers                int     `yaml:"reportingWorkers,omitempty"`
 	EffectivePorts                  []int   `yaml:"effectivePorts,omitempty"`
 	EffectiveMaxUploads             []int   `yaml:"effectiveMaxUploads,omitempty"`
 	EffectiveDownloadTimeoutSeconds []int64 `yaml:"effectiveDownloadTimeoutSeconds,omitempty"`
@@ -147,10 +148,14 @@ func (m *Manager) runtimeConfigYAML() RuntimeConfigYAML {
 }
 
 func workerP2PConfigYAML(db Database) WorkerP2PConfigYAML {
+	if !db.Settings.P2PEnabled {
+		return WorkerP2PConfigYAML{Enabled: false}
+	}
 	ports := uniqueWorkerP2PPorts(db)
 	maxUploads := uniqueWorkerP2PMaxUploads(db)
 	timeouts := uniqueWorkerP2PTimeouts(db)
 	return WorkerP2PConfigYAML{
+		Enabled:                         true,
 		Mode:                            "bestEffortPublicBitTorrent",
 		Discovery:                       "publicDHTAndMagnet",
 		DefaultPort:                     defaultWorkerP2PPort,
