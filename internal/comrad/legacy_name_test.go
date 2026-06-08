@@ -16,6 +16,7 @@ func TestNoLegacyProjectName(t *testing.T) {
 		".agents":         true,
 		".playwright-cli": true,
 		".tools":          true,
+		".build":          true,
 		"data":            true,
 		"dist":            true,
 		"node_modules":    true,

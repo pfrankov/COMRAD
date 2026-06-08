@@ -71,7 +71,13 @@ COMRAD_WORKER_TOKEN="$WORKER_TOKEN" \
 make deploy-production-manager
 ```
 
-Install a macOS Worker LaunchAgent:
+Install and launch the macOS tray app (replaces launchd Worker):
+
+```sh
+make install-tray-macos
+```
+
+Or install a macOS Worker LaunchAgent (headless, no tray app):
 
 ```sh
 cd dist/bundle-darwin-arm64

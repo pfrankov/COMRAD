@@ -165,6 +165,67 @@ make e2e-real
 
 If a client disconnects while a chat request is queued or running, the Manager marks that task `cancelled`. Running attempts receive a Worker cancel message; queued tasks are not assigned later.
 
+## macOS Tray App
+
+The macOS menu-bar app (`clients/macos/`) bundles and supervises the Worker process and replaces the launchd-managed Worker.
+
+Install:
+
+```sh
+make install-tray-macos
+```
+
+This runs `make build`, builds `dist/COMRAD.app`, stops any existing launchd Worker job, copies the app to `/Applications/`, and launches it. The menu-bar icon shows live Worker connection status.
+
+Build without installing:
+
+```sh
+make tray-macos
+```
+
+Run unit tests (requires Xcode.app):
+
+```sh
+make test-tray-macos
+```
+
+Run XCUITest regression tests against the built app:
+
+```sh
+make uitest-tray-macos
+```
+
+### Worker status endpoint
+
+The Worker exposes a loopback-only HTTP status endpoint when `COMRAD_WORKER_STATUS_ADDR` is set. The tray app sets this automatically; to use it directly:
+
+```sh
+COMRAD_WORKER_STATUS_ADDR=127.0.0.1:1923 ./dist/comrad-worker-darwin-arm64
+curl -s 127.0.0.1:1923/status | jq
+curl -s 127.0.0.1:1923/healthz
+```
+
+Only `127.0.0.1` and `::1` are accepted — non-loopback addresses are rejected at bind time. The response is a `WorkerStatusSnapshot` JSON object (shape is frozen; additive changes only).
+
+### Worker env-var ↔ setting mapping
+
+All desktop clients (macOS, future Ubuntu/Windows) map to the same env vars:
+
+| Setting | Env var | Default |
+|---|---|---|
+| Manager URL | `COMRAD_MANAGER_URL` | `http://127.0.0.1:1922` |
+| Worker token | `COMRAD_WORKER_TOKEN` | _(Keychain on macOS)_ |
+| Slot count | `COMRAD_WORKER_SLOTS` | `1` |
+| Status addr | `COMRAD_WORKER_STATUS_ADDR` | `127.0.0.1:1923` |
+| P2P port | `COMRAD_WORKER_P2P_PORT` | `6881` |
+| P2P max uploads | `COMRAD_WORKER_P2P_MAX_UPLOADS` | `8` |
+| P2P timeout | `COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS` | `120` |
+| Disable P2P | `COMRAD_WORKER_DISABLE_P2P` | `false` |
+| Node ID | `COMRAD_NODE_ID` | _(auto-generated)_ |
+| Node name | `COMRAD_NODE_NAME` | _(hostname)_ |
+
+Ubuntu and Windows tray apps are planned as future work and will consume the same `/status` contract and env-var mapping without changes.
+
 ## Rollback
 
 Rollback a local deployment from an explicit bundle:

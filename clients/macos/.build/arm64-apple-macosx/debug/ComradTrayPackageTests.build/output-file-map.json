@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTrayPackageTests.build/primary.swiftdeps"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTrayPackageTests.derived/runner.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTrayPackageTests.build/runner.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTrayPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTrayPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTrayPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTrayPackageTests.build/runner.dia"
+  }
+}

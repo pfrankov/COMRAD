@@ -1,0 +1,163 @@
+import Foundation
+
+enum WorkerProcessState: Equatable {
+    case idle
+    case starting
+    case running(pid: Int32)
+    case stopping
+    case stopped
+    case restarting(attempt: Int)
+    case failed(reason: String)
+}
+
+private let maxBackoffSeconds: Double = 30
+private let backoffBase: Double = 1
+
+func workerBackoff(attempt: Int) -> Double {
+    min(backoffBase * pow(2.0, Double(attempt)), maxBackoffSeconds)
+}
+
+final class WorkerProcess {
+    private(set) var state: WorkerProcessState = .idle
+    var onStateChange: ((WorkerProcessState) -> Void)?
+
+    private var process: Process?
+    private var restartWorkItem: DispatchWorkItem?
+    private var restartAttempt = 0
+    private var lastEnv: [String: String] = [:]
+    private let logFileURL: URL
+    private let errLogFileURL: URL
+    private let workerBinaryURL: URL
+
+    init(workerBinaryURL: URL, dataDir: URL) {
+        self.workerBinaryURL = workerBinaryURL
+        self.logFileURL = dataDir.appendingPathComponent("worker.log")
+        self.errLogFileURL = dataDir.appendingPathComponent("worker.err.log")
+    }
+
+    // Must be called on the main thread.
+    func start(env: [String: String]) {
+        guard case .idle = state else { return }
+        restartAttempt = 0
+        lastEnv = env
+        launchWorker(env: env)
+    }
+
+    // Must be called on the main thread.
+    func stop() {
+        restartWorkItem?.cancel()
+        restartWorkItem = nil
+        let proc = process
+        process = nil
+        updateState(.stopping)
+        if let proc, proc.isRunning {
+            proc.terminate()
+        }
+        updateState(.stopped)
+    }
+
+    // Must be called on the main thread.
+    func restart(env: [String: String]) {
+        stop()
+        updateState(.idle)
+        start(env: env)
+    }
+
+    private func launchWorker(env: [String: String]) {
+        lastEnv = env
+        let proc = Process()
+        proc.executableURL = workerBinaryURL
+        proc.environment = buildEnvironment(env: env)
+        proc.standardOutput = logHandle()
+        proc.standardError = errLogHandle()
+
+        proc.terminationHandler = { [weak self] p in
+            let exitCode = p.terminationStatus
+            DispatchQueue.main.async {
+                self?.handleTermination(exitCode: exitCode)
+            }
+        }
+
+        updateState(.starting)
+        do {
+            try proc.run()
+            process = proc
+            updateState(.running(pid: proc.processIdentifier))
+        } catch {
+            updateState(.failed(reason: error.localizedDescription))
+        }
+    }
+
+    private func handleTermination(exitCode: Int32) {
+        guard case .running = state else { return }
+        restartAttempt += 1
+        let attempt = restartAttempt
+        updateState(.restarting(attempt: attempt))
+        let delay = workerBackoff(attempt: attempt - 1)
+        let env = lastEnv
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            if case .restarting = self.state {
+                self.updateState(.idle)
+                self.launchWorker(env: env)
+            }
+        }
+        restartWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    private func updateState(_ newState: WorkerProcessState) {
+        state = newState
+        onStateChange?(newState)
+    }
+
+    private func buildEnvironment(env: [String: String]) -> [String: String] {
+        var merged = ProcessInfo.processInfo.environment
+        let binDir = workerBinaryURL.deletingLastPathComponent().path
+        merged["DYLD_LIBRARY_PATH"] = binDir
+        for (k, v) in env {
+            merged[k] = v
+        }
+        return merged
+    }
+
+    private func logHandle() -> FileHandle? {
+        FileManager.default.createFile(atPath: logFileURL.path, contents: nil)
+        return try? FileHandle(forWritingTo: logFileURL)
+    }
+
+    private func errLogHandle() -> FileHandle? {
+        FileManager.default.createFile(atPath: errLogFileURL.path, contents: nil)
+        return try? FileHandle(forWritingTo: errLogFileURL)
+    }
+
+    static func resolveWorkerBinary() -> URL? {
+        if let resourceURL = Bundle.main.resourceURL {
+            let candidate = resourceURL.appendingPathComponent("bin/comrad-worker")
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        let devCandidate = Bundle.main.bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("comrad-worker")
+        if FileManager.default.fileExists(atPath: devCandidate.path) {
+            return devCandidate
+        }
+        return nil
+    }
+}
+
+extension WorkerProcessState: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case .idle: return "idle"
+        case .starting: return "starting"
+        case .running(let pid): return "running (pid \(pid))"
+        case .stopping: return "stopping"
+        case .stopped: return "stopped"
+        case .restarting(let n): return "restarting (attempt \(n))"
+        case .failed(let r): return "failed: \(r)"
+        }
+    }
+}

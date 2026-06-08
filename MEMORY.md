@@ -36,6 +36,15 @@ It stores important project context that is easy to lose between sessions: non-o
 - README is intentionally a short getting-started path. Detailed operations, model, scheduling, dashboard, and accounting material belongs under `docs/`.
 - The root product requirements file should describe real implementation status and current requirements, not treat future Windows/Linux/NVIDIA/payment work as already supported.
 
+## macOS Tray App
+
+- `clients/macos/` is a SwiftPM package; `make test-tray-macos` requires Xcode.app (`DEVELOPER_DIR`).
+- The Go worker exposes `GET /status` (JSON `WorkerStatusSnapshot`) and `GET /healthz` on `COMRAD_WORKER_STATUS_ADDR` (loopback-only; non-loopback is rejected at bind time — no iptables needed).
+- `WorkerStatusSnapshot` JSON shape is the cross-platform contract for Ubuntu/Windows future tray clients — additive changes only; do not rename or remove fields.
+- Env-var ↔ setting mapping table lives in `docs/operations.md#worker-env-var--setting-mapping`; Swift `Settings.envVars()` and the table must stay in sync.
+- The tray app first-run LaunchdMigrator unloads `com.comrad.worker.plist` if present; migration state is in `UserDefaults["launchdMigrated"]`.
+- XCUITest regression suites (scenarios S1–S15) need the built `COMRAD.app` and run via `make uitest-tray-macos`; they are not in the fast `validate` gate.
+
 ## Operational Findings
 
 - `make validate` is the cheap confidence gate. Live llama.cpp/GGUF checks belong in explicit e2e or smoke workflows, not the fast gate.

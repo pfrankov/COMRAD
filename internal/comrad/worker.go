@@ -62,6 +62,9 @@ type Worker struct {
 	p2p               workerP2PRuntime
 	conn              *websocket.Conn
 	send              chan Envelope
+	connected         bool
+	lastError         string
+	startedAt         time.Time
 	mu                sync.Mutex
 }
 
@@ -108,6 +111,7 @@ func NewWorker(cfg WorkerConfig) (*Worker, error) {
 		downloadTokens:    make(chan struct{}, cfg.MaxConcurrentDownloads),
 		downloadPressure:  DownloadPressure{MaxConcurrent: cfg.MaxConcurrentDownloads},
 		send:              make(chan Envelope, 256),
+		startedAt:         time.Now().UTC(),
 	}
 	if w.cache == nil {
 		w.cache = map[string]string{}
@@ -276,19 +280,32 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 }
 
-func (w *Worker) connectAndServe(ctx context.Context) error {
+func (w *Worker) connectAndServe(ctx context.Context) (retErr error) {
 	wsURL, err := workerWSURL(w.cfg.ManagerURL)
 	if err != nil {
 		return err
 	}
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, workerWSHeaders(w.cfg.Token))
 	if err != nil {
+		w.mu.Lock()
+		w.lastError = err.Error()
+		w.mu.Unlock()
 		return err
 	}
 	w.mu.Lock()
 	w.conn = conn
 	w.send = make(chan Envelope, 256)
+	w.connected = true
+	w.lastError = ""
 	w.mu.Unlock()
+	defer func() {
+		w.mu.Lock()
+		w.connected = false
+		if retErr != nil {
+			w.lastError = retErr.Error()
+		}
+		w.mu.Unlock()
+	}()
 	defer conn.Close()
 	errCh := make(chan error, 2)
 	go w.writeLoop(ctx, conn, errCh)

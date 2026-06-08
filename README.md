@@ -84,10 +84,21 @@ curl -fsS http://<manager-host>:1922/ready
 | --- | --- | --- |
 | Manager | Server or workstation | Public API, admin API, dashboard, queue, placement, state, artifact URLs |
 | Worker | Compute machine | Model cache, local `llama-server` processes, task execution |
+| macOS Tray App | Worker machine (macOS) | Menu-bar app that bundles, supervises, and configures the Worker |
 | Dashboard | Served by Manager | Operator UI for models, capacity, nodes, API clients, tasks, storage, updates, settings |
 | API client | Your app or script | Sends OpenAI-compatible requests with a client API key |
 | PostgreSQL or SQLite | Manager side | Durable Manager state |
 | Prometheus | Optional Compose service | Metrics storage for `/metrics` |
+
+### macOS Tray App
+
+Install and launch with one command:
+
+```sh
+make install-tray-macos
+```
+
+The tray app replaces the launchd-managed Worker, shows live Worker status in the menu bar, and lets you change settings (Manager URL, token, slot count, P2P) without editing plists. See [docs/operations.md](docs/operations.md#macos-tray-app) for the full reference.
 
 `/metrics` includes bounded per-model/profile capacity gauges for desired vs actual cached and warm copies, warming copies, failed copies, and blocked placement.
 

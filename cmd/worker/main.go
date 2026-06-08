@@ -39,6 +39,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log.Printf("comrad worker %s connecting to %s", comrad.Version, cfg.ManagerURL)
+	statusAddr := os.Getenv("COMRAD_WORKER_STATUS_ADDR")
+	if statusAddr != "" {
+		go func() {
+			if err := worker.ServeStatus(ctx, statusAddr); err != nil {
+				log.Printf("status server error: %v", err)
+			}
+		}()
+	}
 	if err := worker.Run(ctx); err != nil {
 		log.Fatal(err)
 	}

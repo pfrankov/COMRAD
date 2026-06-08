@@ -1,0 +1,68 @@
+{
+  "": {
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/primary.swiftdeps"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/AppDelegate.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/AppDelegate.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/AppDelegate.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/AppDelegate~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/AppDelegate.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/AppDelegate.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/LaunchAtLogin.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchAtLogin.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchAtLogin.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchAtLogin~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchAtLogin.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchAtLogin.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/LaunchdMigrator.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchdMigrator.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchdMigrator.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchdMigrator~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchdMigrator.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/LaunchdMigrator.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/MenuController.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/MenuController.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/MenuController.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/MenuController~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/MenuController.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/MenuController.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/Settings.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/Settings.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/Settings.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/Settings~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/Settings.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/Settings.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/SettingsWindow.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/SettingsWindow.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/SettingsWindow.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/SettingsWindow~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/SettingsWindow.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/SettingsWindow.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/StatusPoller.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/StatusPoller.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/StatusPoller.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/StatusPoller~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/StatusPoller.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/StatusPoller.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/WorkerProcess.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/WorkerProcess.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/WorkerProcess.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/WorkerProcess~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/WorkerProcess.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/WorkerProcess.dia"
+  },
+  "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/Sources/ComradTray/main.swift": {
+    "dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/main.d",
+    "object": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/main.swift.o",
+    "swiftmodule": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/main.swiftdeps",
+    "diagnostics": "/Users/pavel/Documents/repos/comrad/.claude/worktrees/tray-app-and-status-endpoint/clients/macos/.build/arm64-apple-macosx/debug/ComradTray.build/main.dia"
+  }
+}

@@ -4,7 +4,7 @@ DIST ?= dist
 VERSION ?= dev
 LDFLAGS := -s -w -X comrad/internal/comrad.Version=$(VERSION)
 
-.PHONY: validate test go-test-packages build clean bootstrap-go dashboard-deps dashboard-build smoke check-network deploy-local deploy-production-manager rollback-local e2e-real
+.PHONY: validate test go-test-packages build clean bootstrap-go dashboard-deps dashboard-build smoke check-network deploy-local deploy-production-manager rollback-local e2e-real tray-macos install-tray-macos test-tray-macos uitest-tray-macos
 
 bootstrap-go:
 	@scripts/ensure-go.sh
@@ -69,3 +69,15 @@ rollback-local:
 
 e2e-real: build
 	scripts/e2e-real-llama.sh
+
+tray-macos: build
+	bash scripts/build-tray-macos.sh
+
+install-tray-macos: build
+	bash scripts/install-tray-macos.sh
+
+test-tray-macos:
+	DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path clients/macos --filter ComradTrayTests
+
+uitest-tray-macos: tray-macos
+	DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path clients/macos --filter ComradTrayUITests
