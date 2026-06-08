@@ -11,9 +11,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let tokenField = NSSecureTextField()
     private let slotCountField = NSStepper()
     private let slotCountLabel = NSTextField(labelWithString: "1")
-    private let statusPortField = NSTextField()
     private let p2pPortField = NSTextField()
-    private let disableP2PCheck = NSButton(checkboxWithTitle: "Disable P2P", target: nil, action: nil)
 
     init(store: SettingsStore, onSave: @escaping (Settings, String) -> Void) {
         self.store = store
@@ -22,7 +20,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 340),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 260),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -61,8 +59,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         managerURLField.identifier = NSUserInterfaceItemIdentifier("managerURL")
         tokenField.placeholderString = "worker token"
         tokenField.identifier = NSUserInterfaceItemIdentifier("token")
-        statusPortField.placeholderString = "1923"
-        statusPortField.identifier = NSUserInterfaceItemIdentifier("statusPort")
         p2pPortField.placeholderString = "6881"
         p2pPortField.identifier = NSUserInterfaceItemIdentifier("p2pPort")
 
@@ -78,10 +74,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         grid.addRow(with: [label("Manager URL:"), managerURLField])
         grid.addRow(with: [label("Worker Token:"), tokenField])
-        grid.addRow(with: [label("Status Port:"), statusPortField])
         grid.addRow(with: [label("Slots:"), slotRow])
         grid.addRow(with: [label("P2P Port:"), p2pPortField])
-        grid.addRow(with: [NSTextField(labelWithString: ""), disableP2PCheck])
 
         grid.column(at: 0).width = 110
         grid.column(at: 1).width = 260
@@ -107,11 +101,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private func loadValues() {
         managerURLField.stringValue = settings.managerURL
         tokenField.stringValue = token
-        statusPortField.stringValue = "\(settings.statusPort)"
         slotCountField.intValue = Int32(settings.slotCount)
         slotCountLabel.stringValue = "\(settings.slotCount)"
         p2pPortField.stringValue = "\(settings.p2pPort)"
-        disableP2PCheck.state = settings.disableP2P ? .on : .off
     }
 
     @objc private func slotCountChanged() {
@@ -120,10 +112,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func save() {
         settings.managerURL = managerURLField.stringValue
-        settings.statusPort = Int(statusPortField.stringValue) ?? settings.statusPort
         settings.slotCount = Int(slotCountField.intValue)
         settings.p2pPort = Int(p2pPortField.stringValue) ?? settings.p2pPort
-        settings.disableP2P = disableP2PCheck.state == .on
         let newToken = tokenField.stringValue
         try? store.save(settings)
         try? store.saveToken(newToken)
