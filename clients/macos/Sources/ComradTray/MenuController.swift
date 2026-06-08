@@ -134,7 +134,7 @@ final class MenuController: NSObject, NSMenuDelegate {
         statusHeaderItem.image = statusDot(color: color)
 
         if idleOnlyMode && userActive {
-            statusHeaderItem.title = "Paused — screen in use"
+            statusHeaderItem.title = "Paused — Mac in use"
             return
         }
 
