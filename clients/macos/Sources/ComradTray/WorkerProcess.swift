@@ -51,6 +51,7 @@ final class WorkerProcess {
         process = nil
         updateState(.stopping)
         if let proc, proc.isRunning {
+            proc.terminationHandler = nil  // Prevent the async handler from treating this as a crash
             proc.terminate()
         }
         updateState(.stopped)
