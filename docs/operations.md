@@ -207,6 +207,15 @@ curl -s 127.0.0.1:1923/healthz
 
 Only `127.0.0.1` and `::1` are accepted — non-loopback addresses are rejected at bind time. The response is a `WorkerStatusSnapshot` JSON object (shape is frozen; additive changes only).
 
+The status server also accepts pause and resume commands (POST, no auth — loopback-only):
+
+```sh
+curl -s -X POST 127.0.0.1:1923/pause    # report ready slots as idle → no new tasks assigned
+curl -s -X POST 127.0.0.1:1923/resume   # restore ready slot state
+```
+
+Pausing does not kill active tasks; they run to completion. The tray app calls these automatically when "Work Only When Idle" is enabled and the user becomes active or idle.
+
 ### Worker env-var ↔ setting mapping
 
 All desktop clients (macOS, future Ubuntu/Windows) map to the same env vars:
@@ -215,8 +224,11 @@ All desktop clients (macOS, future Ubuntu/Windows) map to the same env vars:
 |---|---|---|
 | Manager URL | `COMRAD_MANAGER_URL` | `http://127.0.0.1:1922` |
 | Worker token | `COMRAD_WORKER_TOKEN` | _(Keychain on macOS)_ |
-| Slot count | `COMRAD_WORKER_SLOTS` | `1` |
+| Slot count | `COMRAD_WORKER_SLOTS` | `1` _(hardcoded in tray app)_ |
 | Status addr | `COMRAD_WORKER_STATUS_ADDR` | `127.0.0.1:1923` |
+| Unified memory | `COMRAD_WORKER_UNIFIED_BYTES` | _(physical RAM in bytes)_ |
+| RAM budget | `COMRAD_WORKER_RAM_BYTES` | _(physical RAM in bytes)_ |
+| Disk budget | `COMRAD_WORKER_DISK_BYTES` | _(available disk in bytes)_ |
 | P2P port | `COMRAD_WORKER_P2P_PORT` | `6881` |
 | P2P max uploads | `COMRAD_WORKER_P2P_MAX_UPLOADS` | `8` |
 | P2P timeout | `COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS` | `120` |

@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -66,6 +67,7 @@ type Worker struct {
 	lastError         string
 	startedAt         time.Time
 	mu                sync.Mutex
+	paused            atomic.Bool
 }
 
 type cachedArtifactState struct {
@@ -405,7 +407,7 @@ func (w *Worker) sendHello() {
 		slots = append(slots, slot)
 	}
 	w.mu.Unlock()
-	w.enqueue(Envelope{ID: NewID("msg"), Type: MsgHello, NodeID: node.ID, Payload: MarshalPayload(HelloPayload{NodeToken: nodeToken, Node: node, Slots: slots})})
+	w.enqueue(Envelope{ID: NewID("msg"), Type: MsgHello, NodeID: node.ID, Payload: MarshalPayload(HelloPayload{NodeToken: nodeToken, Node: node, Slots: w.applyPauseFilter(slots)})})
 }
 
 func (w *Worker) sendFullState() {
@@ -430,7 +432,23 @@ func (w *Worker) sendFullState() {
 		processed = append(processed, id)
 	}
 	w.mu.Unlock()
-	w.enqueue(Envelope{ID: NewID("msg"), Type: MsgFullState, NodeID: node.ID, Payload: MarshalPayload(FullStatePayload{NodeToken: nodeToken, Node: node, Slots: slots, Cached: cached, WarmProfiles: warm, ProcessedIDs: processed})})
+	w.enqueue(Envelope{ID: NewID("msg"), Type: MsgFullState, NodeID: node.ID, Payload: MarshalPayload(FullStatePayload{NodeToken: nodeToken, Node: node, Slots: w.applyPauseFilter(slots), Cached: cached, WarmProfiles: warm, ProcessedIDs: processed})})
+}
+
+// applyPauseFilter returns a copy of slots with ready slots reported as idle when paused.
+func (w *Worker) applyPauseFilter(slots []Slot) []Slot {
+	if !w.paused.Load() {
+		return slots
+	}
+	out := make([]Slot, len(slots))
+	copy(out, slots)
+	for i := range out {
+		if out[i].State == SlotStateReady {
+			out[i].State = SlotStateIdle
+			out[i].AcceptsNew = false
+		}
+	}
+	return out
 }
 
 func (w *Worker) handleEnvelope(ctx context.Context, msg Envelope) error {

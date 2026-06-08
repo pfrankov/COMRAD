@@ -25,6 +25,7 @@ type WorkerStatusSnapshot struct {
 	P2P             *WorkerP2PStatus `json:"p2p,omitempty"`
 	ManagerURL      string           `json:"managerUrl"`
 	LastError       string           `json:"lastError,omitempty"`
+	Paused          bool             `json:"paused,omitempty"`
 	StartedAt       time.Time        `json:"startedAt"`
 	UpdatedAt       time.Time        `json:"updatedAt"`
 }
@@ -71,8 +72,29 @@ func (w *Worker) StatusSnapshot() WorkerStatusSnapshot {
 		P2P:             w.node.P2P,
 		ManagerURL:      w.cfg.ManagerURL,
 		LastError:       w.lastError,
+		Paused:          w.paused.Load(),
 		StartedAt:       w.startedAt,
 		UpdatedAt:       time.Now().UTC(),
+	}
+}
+
+// setPaused enables or disables the idle-pause mode. When paused, slots that are
+// ready are reported as idle to the manager so no new tasks are assigned. Active
+// tasks continue to completion. When unpaused, ready slots are re-advertised.
+func (w *Worker) setPaused(paused bool) {
+	if w.paused.Swap(paused) == paused {
+		return // no change
+	}
+	w.mu.Lock()
+	slots := make([]Slot, 0, len(w.slots))
+	for _, s := range w.slots {
+		slots = append(slots, s)
+	}
+	w.mu.Unlock()
+	for _, slot := range slots {
+		if slot.State == SlotStateReady {
+			w.sendSlotState(slot) // sendSlotState applies the pause filter
+		}
 	}
 }
 
@@ -110,6 +132,22 @@ func (w *Worker) serveStatus(ctx context.Context, addr string, addrCh chan<- str
 		_ = json.NewEncoder(rw).Encode(snap)
 	})
 	mux.HandleFunc("/healthz", func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/pause", func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.setPaused(true)
+		rw.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/resume", func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.setPaused(false)
 		rw.WriteHeader(http.StatusOK)
 	})
 

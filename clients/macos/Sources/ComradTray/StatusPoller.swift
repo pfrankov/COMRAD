@@ -16,6 +16,7 @@ struct WorkerStatusSnapshot: Decodable {
     var p2p: WorkerP2PStatus?
     var managerUrl: String
     var lastError: String?
+    var paused: Bool?
     var startedAt: String
     var updatedAt: String
 }

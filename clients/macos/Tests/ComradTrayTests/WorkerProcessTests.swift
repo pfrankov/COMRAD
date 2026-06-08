@@ -6,7 +6,6 @@ final class WorkerProcessTests: XCTestCase {
     func testEnvVarsMapsAllRequiredKeys() {
         var s = Settings()
         s.managerURL = "http://manager:9000"
-        s.slotCount = 2
         s.statusPort = 1923
         s.p2pPort = 6881
         s.disableP2P = false

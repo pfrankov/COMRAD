@@ -165,9 +165,13 @@ func profileUsesArtifact(profile WorkloadProfile, artifactID string) bool {
 }
 
 func (w *Worker) sendSlotState(slot Slot) {
+	state := slot.State
+	if w.paused.Load() && state == SlotStateReady {
+		state = SlotStateIdle
+	}
 	w.enqueue(Envelope{ID: NewID("msg"), Type: MsgSlotState, NodeID: w.node.ID, Payload: MarshalPayload(SlotStatePayload{
 		SlotID:         slot.ID,
-		State:          slot.State,
+		State:          state,
 		ProfileID:      slot.ProfileID,
 		ActiveTaskID:   slot.ActiveTaskID,
 		MismatchReason: slot.MismatchReason,

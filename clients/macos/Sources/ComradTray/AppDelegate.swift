@@ -10,15 +10,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settings: Settings = Settings()
     private var token: String = ""
 
+    private let idleDetector = IdleDetector()
+    private let workerControl = WorkerControl()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         settings = store.load()
         token = store.loadToken()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
-            button.title = "⬡"
-            button.font = NSFont.systemFont(ofSize: 14)
-        }
 
         menuController = MenuController(statusItem: statusItem)
         wireMenuActions()
@@ -28,9 +27,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { self?.pollerDidUpdate(state) }
         }
 
+        idleDetector.onStateChange = { [weak self] _ in
+            self?.idleStateDidChange()
+        }
+
         migrateIfNeeded()
         startWorkerIfNeeded()
         statusPoller.start()
+
+        if settings.idleOnlyMode {
+            idleDetector.start()
+        }
+
+        refreshMenu()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -42,10 +51,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func wireMenuActions() {
         menuController.onStartWorker = { [weak self] in self?.startWorkerIfNeeded() }
         menuController.onStopWorker = { [weak self] in self?.workerProcess?.stop() }
-        menuController.onToggleP2P = { [weak self] in self?.toggleP2P() }
         menuController.onOpenSettings = { [weak self] in self?.openSettings() }
         menuController.onOpenLogs = { [weak self] in self?.openLogs() }
         menuController.onToggleLaunchAtLogin = { [weak self] in self?.toggleLaunchAtLogin() }
+        menuController.onToggleIdleOnlyMode = { [weak self] in self?.toggleIdleOnlyMode() }
         menuController.onQuit = { NSApp.terminate(nil) }
     }
 
@@ -77,12 +86,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         workerProcess = proc
         proc.start(env: settings.envVars(token: token))
-    }
-
-    private func toggleP2P() {
-        settings.disableP2P.toggle()
-        try? store.save(settings)
-        workerProcess?.restart(env: settings.envVars(token: token))
     }
 
     private func openSettings() {
@@ -125,11 +128,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshMenu()
     }
 
+    private func toggleIdleOnlyMode() {
+        settings.idleOnlyMode.toggle()
+        try? store.save(settings)
+
+        if settings.idleOnlyMode {
+            idleDetector.start()
+            applyIdleState()
+        } else {
+            idleDetector.stop()
+            // Resume worker since idle-only is off
+            workerControl.setPaused(false, port: settings.statusPort)
+        }
+        refreshMenu()
+    }
+
+    private func idleStateDidChange() {
+        applyIdleState()
+        refreshMenu()
+    }
+
+    private func applyIdleState() {
+        guard settings.idleOnlyMode else { return }
+        let shouldPause = idleDetector.state == .active
+        workerControl.setPaused(shouldPause, port: settings.statusPort)
+    }
+
     private func pollerDidUpdate(_ state: PollerState) {
         refreshMenu()
     }
 
     private func workerDidChangeState(_ state: WorkerProcessState) {
+        // Re-apply pause state after worker restarts so the new process is paused if needed.
+        if case .running = state {
+            applyIdleState()
+        }
         refreshMenu()
     }
 
@@ -137,7 +170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuController.update(
             pollerState: statusPoller.state,
             workerState: workerProcess?.state ?? .idle,
-            p2pDisabled: settings.disableP2P
+            idleOnlyMode: settings.idleOnlyMode,
+            userActive: idleDetector.state == .active
         )
     }
 }

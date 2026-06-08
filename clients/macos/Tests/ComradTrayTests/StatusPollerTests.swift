@@ -30,6 +30,31 @@ final class StatusPollerTests: XCTestCase {
         XCTAssertEqual(snap.cachedCount, 2)
         XCTAssertNil(snap.lastError)
         XCTAssertNil(snap.p2p)
+        XCTAssertNil(snap.paused, "paused should be nil when absent")
+    }
+
+    func testDecodesSnapshotWithPausedTrue() throws {
+        let json = """
+        {
+          "connected": true,
+          "nodeId": "node-p",
+          "nodeName": "paused-machine",
+          "version": "dev",
+          "target": "darwin-arm64-metal",
+          "runtimeAdapters": [],
+          "slots": [],
+          "cachedCount": 0,
+          "warmCount": 0,
+          "warmProfiles": [],
+          "managerUrl": "http://127.0.0.1:1922",
+          "paused": true,
+          "startedAt": "2026-06-08T00:00:00Z",
+          "updatedAt": "2026-06-08T00:00:01Z"
+        }
+        """.data(using: .utf8)!
+
+        let snap = try JSONDecoder().decode(WorkerStatusSnapshot.self, from: json)
+        XCTAssertEqual(snap.paused, true)
     }
 
     func testDecodesSnapshotWithOptionalP2PAndError() throws {

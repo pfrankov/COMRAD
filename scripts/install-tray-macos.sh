@@ -21,9 +21,12 @@ launchctl unload ~/Library/LaunchAgents/com.comrad.worker.plist 2>/dev/null || t
 
 # Install
 echo "==> Installing COMRAD.app to /Applications..."
-cp -r "$DIST/COMRAD.app" /Applications/COMRAD.app
+rm -rf /Applications/COMRAD.app
+cp -r "$DIST/COMRAD.app" /Applications/
 
 echo "==> Launching COMRAD.app..."
+pkill -x ComradTray 2>/dev/null || true
+sleep 1
 open /Applications/COMRAD.app
 
 echo ""

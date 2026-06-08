@@ -279,7 +279,11 @@ func (w *Worker) setSlotState(slotID, state, profileID, reason string) {
 	slot.AcceptsNew = state == SlotStateReady
 	w.slots[slotID] = slot
 	w.mu.Unlock()
-	w.enqueue(Envelope{ID: NewID("msg"), Type: MsgSlotState, NodeID: w.node.ID, Payload: MarshalPayload(SlotStatePayload{SlotID: slotID, State: state, ProfileID: profileID, ProfileVersion: slot.ProfileVersion, LogicalModel: slot.LogicalModel, RuntimeVariantID: slot.RuntimeVariantID, ModelArtifactID: slot.ModelArtifactID, ModelSHA256: slot.ModelSHA256, MismatchReason: reason})})
+	reportedState := state
+	if w.paused.Load() && reportedState == SlotStateReady {
+		reportedState = SlotStateIdle
+	}
+	w.enqueue(Envelope{ID: NewID("msg"), Type: MsgSlotState, NodeID: w.node.ID, Payload: MarshalPayload(SlotStatePayload{SlotID: slotID, State: reportedState, ProfileID: profileID, ProfileVersion: slot.ProfileVersion, LogicalModel: slot.LogicalModel, RuntimeVariantID: slot.RuntimeVariantID, ModelArtifactID: slot.ModelArtifactID, ModelSHA256: slot.ModelSHA256, MismatchReason: reason})})
 }
 
 func assignmentKey(profile WorkloadProfile) string {

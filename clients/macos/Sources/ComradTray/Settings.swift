@@ -7,7 +7,6 @@ private let keychainTokenAccount = "worker-token"
 
 struct Settings: Codable, Equatable {
     var managerURL: String = "http://127.0.0.1:1922"
-    var slotCount: Int = 1
     var statusPort: Int = 1923
     var p2pPort: Int = 6881
     var p2pMaxUploads: Int = 8
@@ -16,22 +15,34 @@ struct Settings: Codable, Equatable {
     var nodeID: String = ""
     var nodeName: String = ""
     var launchAtLogin: Bool = false
+    var memoryGB: Int = Settings.physicalMemoryGB()
+    var diskGB: Int = Settings.availableDiskGB()
+    var idleOnlyMode: Bool = false
 
     // token is stored in Keychain, not serialized to JSON
     enum CodingKeys: String, CodingKey {
-        case managerURL, slotCount, statusPort, p2pPort, p2pMaxUploads,
-             p2pDownloadTimeoutSeconds, disableP2P, nodeID, nodeName, launchAtLogin
+        case managerURL, statusPort, p2pPort, p2pMaxUploads,
+             p2pDownloadTimeoutSeconds, disableP2P, nodeID, nodeName, launchAtLogin,
+             memoryGB, diskGB, idleOnlyMode
     }
 
     func envVars(token: String) -> [String: String] {
+        let appSupport = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dataDir = appSupport.appendingPathComponent("COMRAD/data")
         var env: [String: String] = [
             "COMRAD_MANAGER_URL": managerURL,
-            "COMRAD_WORKER_SLOTS": "\(slotCount)",
+            "COMRAD_WORKER_SLOTS": "1",
             "COMRAD_WORKER_STATUS_ADDR": "127.0.0.1:\(statusPort)",
             "COMRAD_WORKER_P2P_PORT": "\(p2pPort)",
             "COMRAD_WORKER_P2P_MAX_UPLOADS": "\(p2pMaxUploads)",
             "COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS": "\(p2pDownloadTimeoutSeconds)",
             "COMRAD_WORKER_DISABLE_P2P": disableP2P ? "true" : "false",
+            "COMRAD_WORKER_STATE_PATH": dataDir.appendingPathComponent("worker-state.json").path,
+            "COMRAD_WORKER_CACHE_DIR": dataDir.appendingPathComponent("worker-cache").path,
+            "COMRAD_WORKER_UNIFIED_BYTES": "\(Int64(memoryGB) * (1 << 30))",
+            "COMRAD_WORKER_RAM_BYTES": "\(Int64(memoryGB) * (1 << 30))",
+            "COMRAD_WORKER_DISK_BYTES": "\(Int64(diskGB) * (1 << 30))",
         ]
         if !token.isEmpty {
             env["COMRAD_WORKER_TOKEN"] = token
@@ -48,8 +59,10 @@ struct Settings: Codable, Equatable {
 
 final class SettingsStore {
     let fileURL: URL
+    private let keychainAccount: String
 
-    init(fileURL: URL? = nil) {
+    init(fileURL: URL? = nil, keychainAccount: String = keychainTokenAccount) {
+        self.keychainAccount = keychainAccount
         if let url = fileURL {
             self.fileURL = url
         } else {
@@ -80,7 +93,7 @@ final class SettingsStore {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainTokenAccount,
+            kSecAttrAccount as String: keychainAccount,
             kSecValueData as String: data,
         ]
         SecItemDelete(query as CFDictionary)
@@ -94,7 +107,7 @@ final class SettingsStore {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainTokenAccount,
+            kSecAttrAccount as String: keychainAccount,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -110,5 +123,18 @@ final class SettingsStore {
 
     enum KeychainError: Error {
         case saveFailed(OSStatus)
+    }
+}
+
+extension Settings {
+    static func physicalMemoryGB() -> Int {
+        Int(ProcessInfo.processInfo.physicalMemory / (1 << 30))
+    }
+
+    static func availableDiskGB() -> Int {
+        let url = URL(fileURLWithPath: NSHomeDirectory())
+        let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        let bytes = values?.volumeAvailableCapacityForImportantUsage ?? Int64(20 << 30)
+        return Int(bytes / (1 << 30))
     }
 }
