@@ -36,6 +36,7 @@ type WorkerConfig struct {
 	P2PPort                int
 	P2PMaxUploads          int
 	P2PDownloadTimeout     time.Duration
+	DisableP2P             bool
 	EnableSelfUpdate       bool
 	p2pClientConfigHook    func(*torrent.ClientConfig)
 	p2pFactory             func(WorkerConfig) (workerP2PRuntime, *WorkerP2PStatus, error)
@@ -430,7 +431,7 @@ func (w *Worker) handleEnvelope(ctx context.Context, msg Envelope) error {
 type workerInboundHandler func(*Worker, context.Context, Envelope) error
 
 func workerInboundHandlers() map[string]workerInboundHandler {
-	return map[string]workerInboundHandler{MsgAck: workerAck, MsgAssignProfile: workerAssignProfile, MsgExecuteTask: workerExecuteTask, MsgCancelTask: workerCancelTask, MsgEvictArtifact: workerEvictArtifact, MsgUpdateWorker: workerUpdate}
+	return map[string]workerInboundHandler{MsgAck: workerAck, MsgAssignProfile: workerAssignProfile, MsgExecuteTask: workerExecuteTask, MsgCancelTask: workerCancelTask, MsgEvictArtifact: workerEvictArtifact, MsgP2PConfig: workerP2PConfig, MsgUpdateWorker: workerUpdate}
 }
 
 func (w *Worker) seen(id string) bool {

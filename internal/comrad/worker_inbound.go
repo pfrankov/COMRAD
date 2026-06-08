@@ -54,6 +54,16 @@ func workerCancelTask(w *Worker, ctx context.Context, msg Envelope) error {
 	return nil
 }
 
+func workerP2PConfig(w *Worker, ctx context.Context, msg Envelope) error {
+	var payload P2PConfigPayload
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		return err
+	}
+	w.applyP2PConfig(payload.Enabled)
+	w.enqueue(Envelope{ID: msg.ID, Type: MsgAck, NodeID: w.node.ID})
+	return nil
+}
+
 func workerUpdate(w *Worker, ctx context.Context, msg Envelope) error {
 	var payload UpdatePayload
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {

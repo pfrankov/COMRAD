@@ -29,6 +29,7 @@ func main() {
 		P2PPort:                envInt("COMRAD_WORKER_P2P_PORT", 6881),
 		P2PMaxUploads:          envInt("COMRAD_WORKER_P2P_MAX_UPLOADS", 8),
 		P2PDownloadTimeout:     time.Duration(envInt("COMRAD_WORKER_P2P_DOWNLOAD_TIMEOUT_SECONDS", 120)) * time.Second,
+		DisableP2P:             envBool("COMRAD_WORKER_DISABLE_P2P", false),
 		EnableSelfUpdate:       envBool("COMRAD_ENABLE_SELF_UPDATE", false),
 	}
 	worker, err := comrad.NewWorker(cfg)

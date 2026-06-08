@@ -473,6 +473,7 @@ func (m *Manager) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if req.P2PEnabled != nil {
+			m.broadcastP2PConfig(*req.P2PEnabled)
 			m.replanAndDispatch()
 		}
 		writeJSON(w, http.StatusOK, m.store.Snapshot().Settings)

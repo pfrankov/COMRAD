@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -344,6 +345,9 @@ func (a peerAddrAddr) String() string { return string(a) }
 func (a peerAddrAddr) Network() string { return "tcp" }
 
 func (w *Worker) initP2P() error {
+	if w.cfg.DisableP2P {
+		return nil
+	}
 	factory := w.cfg.p2pFactory
 	if factory == nil {
 		factory = newAnacrolixWorkerP2P
@@ -377,20 +381,86 @@ func (w *Worker) closeP2P() {
 	}
 }
 
+func (w *Worker) p2pRuntime() workerP2PRuntime {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.p2p
+}
+
 func (w *Worker) refreshP2PState() {
-	if w.p2p == nil {
+	p2p := w.p2pRuntime()
+	if p2p == nil {
 		return
 	}
+	snapshot := p2p.Snapshot()
 	w.mu.Lock()
-	w.node.P2P = w.p2p.Snapshot()
+	w.node.P2P = snapshot
 	w.mu.Unlock()
 }
 
+func (w *Worker) applyP2PConfig(enabled bool) {
+	if w.cfg.DisableP2P {
+		return
+	}
+	if !enabled {
+		w.mu.Lock()
+		p2p := w.p2p
+		w.p2p = nil
+		w.node.P2P = nil
+		w.mu.Unlock()
+		if p2p != nil {
+			p2p.Close()
+		}
+		return
+	}
+	w.mu.Lock()
+	running := w.p2p != nil
+	w.mu.Unlock()
+	if running {
+		return
+	}
+	factory := w.cfg.p2pFactory
+	if factory == nil {
+		factory = newAnacrolixWorkerP2P
+	}
+	p2p, status, err := factory(w.cfg)
+	if err != nil {
+		log.Printf("worker: p2p re-init failed: %v", err)
+		return
+	}
+	w.mu.Lock()
+	w.p2p = p2p
+	w.node.P2P = cloneWorkerP2PStatus(status)
+	w.mu.Unlock()
+	w.reseedCachedArtifacts()
+	w.refreshP2PState()
+}
+
+func (w *Worker) reseedCachedArtifacts() {
+	w.mu.Lock()
+	entries := make(map[string]cachedArtifactState, len(w.cacheState))
+	for k, v := range w.cacheState {
+		entries[k] = v
+	}
+	w.mu.Unlock()
+	for artifactID, entry := range entries {
+		if entry.Path == "" || entry.Torrent == nil {
+			continue
+		}
+		_ = w.seedCachedArtifact(ArtifactSpec{
+			ID:      artifactID,
+			SHA256:  artifactID,
+			Torrent: cloneArtifactTorrent(entry.Torrent),
+		}, entry.Path)
+	}
+}
+
 func (w *Worker) seedCachedArtifact(artifact ArtifactSpec, path string) error {
-	if w.p2p == nil || !w.p2p.Available() || artifact.Torrent == nil || path == "" {
+	p2p := w.p2pRuntime()
+	if p2p == nil || !p2p.Available() || artifact.Torrent == nil || path == "" {
 		return nil
 	}
-	if err := w.p2p.Seed(artifact, path); err != nil {
+	if err := p2p.Seed(artifact, path); err != nil {
 		w.refreshP2PState()
 		return err
 	}

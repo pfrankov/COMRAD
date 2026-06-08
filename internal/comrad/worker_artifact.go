@@ -65,29 +65,28 @@ func (w *Worker) downloadArtifact(ctx context.Context, artifact ArtifactSpec) (a
 }
 
 func (w *Worker) downloadArtifactWithTorrent(ctx context.Context, artifact ArtifactSpec, target string) (artifactDownloadResult, error) {
-	if w.p2p == nil || artifact.Torrent == nil {
+	p2p := w.p2pRuntime()
+	if p2p == nil || artifact.Torrent == nil {
 		return artifactDownloadResult{}, nil
 	}
 	if len(artifact.P2PPeers) > 0 {
-		w.p2p.AddPeers(artifact.ID, artifact.P2PPeers)
+		p2p.AddPeers(artifact.ID, artifact.P2PPeers)
 	}
 	torrentCtx, cancel := context.WithTimeout(ctx, w.cfg.P2PDownloadTimeout)
 	defer cancel()
-	if err := w.p2p.Download(torrentCtx, artifact, target); err != nil {
+	if err := p2p.Download(torrentCtx, artifact, target); err != nil {
 		reason := p2pFailureDownload
 		if downloadErr, ok := err.(*p2pDownloadError); ok {
 			reason = downloadErr.reason
 		}
-		w.p2p.RecordFallback(reason, err)
+		p2p.RecordFallback(reason, err)
 		w.refreshP2PState()
 		return artifactDownloadResult{Method: artifactDeliveryHTTPFallback}, err
 	}
 	if err := VerifyFileSHA256(target, artifact.SHA256); err != nil {
-		if w.p2p != nil {
-			w.p2p.StopSeeding(artifact.ID)
-		}
+		p2p.StopSeeding(artifact.ID)
 		_ = os.Remove(target)
-		w.p2p.RecordFallback(FailureArtifactDigestMismatch, err)
+		p2p.RecordFallback(FailureArtifactDigestMismatch, err)
 		w.refreshP2PState()
 		return artifactDownloadResult{Method: artifactDeliveryHTTPFallback}, err
 	}
@@ -149,8 +148,8 @@ func (w *Worker) artifactAlreadyCached(artifact ArtifactSpec) bool {
 		w.sendArtifactState(artifact, "verified", "")
 		return true
 	}
-	if w.p2p != nil {
-		w.p2p.StopSeeding(artifact.ID)
+	if p2p := w.p2pRuntime(); p2p != nil {
+		p2p.StopSeeding(artifact.ID)
 		w.refreshP2PState()
 	}
 	_ = os.Remove(existing)

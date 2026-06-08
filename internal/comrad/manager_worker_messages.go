@@ -243,6 +243,7 @@ func (m *Manager) upsertWorkerState(s *workerSession, node Node, slots []Slot, c
 	}
 	ack := WorkerRegistrationAck{Status: "registered", NodeToken: issuedNodeToken}
 	s.enqueue(Envelope{ID: NewID("msg"), Type: MsgAck, NodeID: node.ID, Payload: MarshalPayload(ack)})
+	m.sendP2PConfigToSession(s)
 	m.replanAndDispatch()
 	return nil
 }

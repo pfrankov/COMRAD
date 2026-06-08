@@ -389,3 +389,22 @@ func remoteHostOnly(addr string) string {
 	}
 	return host
 }
+
+func (m *Manager) broadcastP2PConfig(enabled bool) {
+	msg := Envelope{ID: NewID("msg"), Type: MsgP2PConfig, Payload: MarshalPayload(P2PConfigPayload{Enabled: enabled})}
+	m.mu.Lock()
+	sessions := make([]*workerSession, 0, len(m.sessions))
+	for _, s := range m.sessions {
+		sessions = append(sessions, s)
+	}
+	m.mu.Unlock()
+	for _, s := range sessions {
+		s.enqueue(msg)
+	}
+}
+
+func (m *Manager) sendP2PConfigToSession(s *workerSession) {
+	enabled := m.store.Snapshot().Settings.P2PEnabled
+	msg := Envelope{ID: NewID("msg"), Type: MsgP2PConfig, Payload: MarshalPayload(P2PConfigPayload{Enabled: enabled})}
+	s.enqueue(msg)
+}

@@ -13,6 +13,7 @@ const (
 	MsgExecuteTask      = "manager.execute_task"
 	MsgCancelTask       = "manager.cancel_task"
 	MsgEvictArtifact    = "manager.evict_artifact"
+	MsgP2PConfig        = "manager.p2p_config"
 	MsgUpdateWorker     = "manager.update_worker"
 	MsgAck              = "control.ack"
 	MsgToken            = "attempt.token"
@@ -94,6 +95,10 @@ type CancelTaskPayload struct {
 type EvictArtifactPayload struct {
 	ArtifactID string `json:"artifactId"`
 	Reason     string `json:"reason,omitempty"`
+}
+
+type P2PConfigPayload struct {
+	Enabled bool `json:"enabled"`
 }
 
 type TokenPayload struct {

@@ -21,6 +21,7 @@ type mockP2PFallbackRecord struct {
 
 type mockWorkerP2P struct {
 	available    bool
+	closed       bool
 	snapshot     *WorkerP2PStatus
 	downloadFunc func(ctx context.Context, artifact ArtifactSpec, target string) error
 	seedCalls    []ArtifactSpec
@@ -59,7 +60,7 @@ func (m *mockWorkerP2P) RecordFallback(reason string, err error) {
 
 func (m *mockWorkerP2P) AddPeers(artifactID string, addrs []string) {}
 
-func (m *mockWorkerP2P) Close() {}
+func (m *mockWorkerP2P) Close() { m.closed = true }
 
 func newMockP2PWorkerForTest(t *testing.T, mock *mockWorkerP2P, cfg WorkerConfig) *Worker {
 	t.Helper()
@@ -656,4 +657,153 @@ func TestWorkerDownloadsViaTorrentWithManagerRelayedPeers(t *testing.T) {
 	}
 
 	_ = seederRuntime
+}
+
+func TestApplyP2PConfigTeardown(t *testing.T) {
+	dir := t.TempDir()
+	mock := &mockWorkerP2P{
+		available: true,
+		snapshot:  &WorkerP2PStatus{Available: true, Port: 6881},
+	}
+	worker := newMockP2PWorkerForTest(t, mock, WorkerConfig{
+		NodeID:                 "node-toggle-off",
+		StatePath:              filepath.Join(dir, "state.json"),
+		CacheDir:               filepath.Join(dir, "cache"),
+		SlotCount:              1,
+		MaxConcurrentDownloads: 1,
+	})
+
+	worker.applyP2PConfig(false)
+
+	if worker.p2pRuntime() != nil {
+		t.Fatal("expected w.p2p to be nil after disable")
+	}
+	worker.mu.Lock()
+	nodeP2P := worker.node.P2P
+	worker.mu.Unlock()
+	if nodeP2P != nil {
+		t.Fatal("expected node.P2P to be nil after disable")
+	}
+	if !mock.closed {
+		t.Fatal("expected runtime Close() to be called on disable")
+	}
+}
+
+func TestApplyP2PConfigReenableReseeds(t *testing.T) {
+	dir := t.TempDir()
+	call := 0
+	var secondMock *mockWorkerP2P
+	cfg := WorkerConfig{
+		NodeID:                 "node-toggle-on",
+		StatePath:              filepath.Join(dir, "state.json"),
+		CacheDir:               filepath.Join(dir, "cache"),
+		SlotCount:              1,
+		MaxConcurrentDownloads: 1,
+	}
+	cfg.p2pFactory = func(_ WorkerConfig) (workerP2PRuntime, *WorkerP2PStatus, error) {
+		call++
+		m := &mockWorkerP2P{available: true, snapshot: &WorkerP2PStatus{Available: true, Port: 6881}}
+		if call >= 2 {
+			secondMock = m
+		}
+		return m, m.snapshot, nil
+	}
+	worker, err := NewWorker(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker.send = make(chan Envelope, 64)
+
+	// seed a cached artifact so reseed is exercised on re-enable
+	artifactID := "sha256:aabbcc"
+	torrentMeta := &ArtifactTorrent{MetaInfoBytes: []byte("fake")}
+	worker.mu.Lock()
+	worker.cacheState[artifactID] = cachedArtifactState{Path: "/fake/path", Torrent: torrentMeta}
+	worker.mu.Unlock()
+
+	worker.applyP2PConfig(false)
+	if worker.p2pRuntime() != nil {
+		t.Fatal("expected p2p nil after disable")
+	}
+
+	worker.applyP2PConfig(true)
+	if worker.p2pRuntime() == nil {
+		t.Fatal("expected p2p to be re-created after enable")
+	}
+	if secondMock == nil || len(secondMock.seedCalls) == 0 {
+		t.Fatal("expected Seed to be called for cached artifact on re-enable")
+	}
+	if secondMock.seedCalls[0].ID != artifactID {
+		t.Fatalf("expected seed for %q, got %q", artifactID, secondMock.seedCalls[0].ID)
+	}
+}
+
+func TestApplyP2PConfigDisableP2PFlagPreventsReinit(t *testing.T) {
+	dir := t.TempDir()
+	initCalls := 0
+	worker, err := NewWorker(WorkerConfig{
+		NodeID:                 "node-disabled-p2p",
+		StatePath:              filepath.Join(dir, "state.json"),
+		CacheDir:               filepath.Join(dir, "cache"),
+		SlotCount:              1,
+		MaxConcurrentDownloads: 1,
+		DisableP2P:             true,
+		p2pFactory: func(_ WorkerConfig) (workerP2PRuntime, *WorkerP2PStatus, error) {
+			initCalls++
+			return &mockWorkerP2P{snapshot: &WorkerP2PStatus{}}, &WorkerP2PStatus{}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker.send = make(chan Envelope, 64)
+
+	worker.applyP2PConfig(true)
+
+	if initCalls != 0 {
+		t.Fatalf("expected 0 factory calls with DisableP2P=true, got %d", initCalls)
+	}
+	if worker.p2pRuntime() != nil {
+		t.Fatal("expected p2p to remain nil when DisableP2P is set")
+	}
+}
+
+func TestWorkerP2PConfigMessageHandlerAcks(t *testing.T) {
+	dir := t.TempDir()
+	mock := &mockWorkerP2P{
+		available: true,
+		snapshot:  &WorkerP2PStatus{Available: true, Port: 6881},
+	}
+	worker := newMockP2PWorkerForTest(t, mock, WorkerConfig{
+		NodeID:                 "node-config-ack",
+		StatePath:              filepath.Join(dir, "state.json"),
+		CacheDir:               filepath.Join(dir, "cache"),
+		SlotCount:              1,
+		MaxConcurrentDownloads: 1,
+	})
+
+	msgID := NewID("msg")
+	env := Envelope{
+		ID:      msgID,
+		Type:    MsgP2PConfig,
+		NodeID:  worker.node.ID,
+		Payload: MarshalPayload(P2PConfigPayload{Enabled: false}),
+	}
+	if err := workerP2PConfig(worker, nil, env); err != nil {
+		t.Fatal(err)
+	}
+
+	msgs := drainWorkerSend(worker)
+	var gotAck bool
+	for _, m := range msgs {
+		if m.Type == MsgAck && m.ID == msgID {
+			gotAck = true
+		}
+	}
+	if !gotAck {
+		t.Fatalf("expected MsgAck with id %q, got %+v", msgID, msgs)
+	}
+	if worker.p2pRuntime() != nil {
+		t.Fatal("expected p2p disabled after MsgP2PConfig{Enabled:false}")
+	}
 }

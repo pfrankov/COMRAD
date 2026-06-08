@@ -33,8 +33,8 @@ func (w *Worker) evictArtifact(payload EvictArtifactPayload) error {
 	for _, proc := range plan.procs {
 		proc.stop()
 	}
-	if w.p2p != nil {
-		w.p2p.StopSeeding(artifactID)
+	if p2p := w.p2pRuntime(); p2p != nil {
+		p2p.StopSeeding(artifactID)
 		w.refreshP2PState()
 	}
 	if plan.path != "" {
