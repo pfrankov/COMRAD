@@ -78,7 +78,7 @@ final class MenuController: NSObject, NSMenuDelegate {
                 userActive: Bool) {
         idleOnlyItem.state = idleOnlyMode ? .on : .off
         let color = statusColor(pollerState: pollerState, idleOnlyMode: idleOnlyMode, userActive: userActive)
-        let alpha: CGFloat = isVisibleToManager(pollerState: pollerState) ? 1.0 : 0.4
+        let alpha: CGFloat = isVisibleToManager(pollerState: pollerState) ? 1.0 : 0.6
         updateStatusHeader(pollerState: pollerState, idleOnlyMode: idleOnlyMode, userActive: userActive, color: color)
         updateTrayIcon(color: color, alpha: alpha)
         updateWorkerToggle(workerState: workerState)
