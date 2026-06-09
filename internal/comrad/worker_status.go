@@ -7,7 +7,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -168,6 +170,11 @@ func (w *Worker) serveStatus(ctx context.Context, addr string, addrCh chan<- str
 				_, _ = rw.Write([]byte(err.Error()))
 				return
 			}
+			// evictArtifact succeeds but skips file removal when the artifact
+			// is not tracked in w.cache (orphaned file). Delete explicitly.
+			if hash := strings.TrimPrefix(NormalizeSHA256(artifactID), "sha256:"); hash != "" {
+				_ = os.Remove(filepath.Join(w.cfg.CacheDir, "sha256_"+hash))
+			}
 			rw.WriteHeader(http.StatusOK)
 		default:
 			rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -205,7 +212,9 @@ func (w *Worker) cacheList() []CachedArtifactInfo {
 	}
 	w.mu.Lock()
 	entries := make([]entry, 0, len(w.cache))
+	seen := map[string]bool{}
 	for id, path := range w.cache {
+		seen[id] = true
 		e := entry{id: id, path: path}
 		for profileID, profile := range w.warm {
 			if profileUsesArtifact(profile, id) {
@@ -221,6 +230,7 @@ func (w *Worker) cacheList() []CachedArtifactInfo {
 		}
 		entries = append(entries, e)
 	}
+	cacheDir := w.cfg.CacheDir
 	w.mu.Unlock()
 
 	result := make([]CachedArtifactInfo, 0, len(entries))
@@ -231,6 +241,29 @@ func (w *Worker) cacheList() []CachedArtifactInfo {
 		}
 		result = append(result, info)
 	}
+
+	// Include files present on disk but not tracked in w.cache (state loss after crash/kill).
+	if dirEntries, err := os.ReadDir(cacheDir); err == nil {
+		for _, de := range dirEntries {
+			if de.IsDir() || strings.HasSuffix(de.Name(), ".tmp") {
+				continue
+			}
+			const prefix = "sha256_"
+			if !strings.HasPrefix(de.Name(), prefix) {
+				continue
+			}
+			id := NormalizeSHA256(strings.TrimPrefix(de.Name(), prefix))
+			if seen[id] {
+				continue
+			}
+			info := CachedArtifactInfo{ID: id}
+			if fi, err := de.Info(); err == nil {
+				info.SizeBytes = fi.Size()
+			}
+			result = append(result, info)
+		}
+	}
+
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
 }
