@@ -293,8 +293,290 @@ func seedProfileConfigArtifacts(t *testing.T, manager *Manager) {
 	if err := manager.store.Update(func(db *Database) error {
 		db.Artifacts["sha256:model"] = Artifact{ID: "sha256:model", SHA256: "sha256:model", Kind: "model_gguf", Name: "model.gguf", CreatedAt: now}
 		db.Artifacts["sha256:mmproj"] = Artifact{ID: "sha256:mmproj", SHA256: "sha256:mmproj", Kind: "model_mmproj", Name: "mmproj.gguf", CreatedAt: now}
+		db.Artifacts["sha256:linux-model"] = Artifact{ID: "sha256:linux-model", SHA256: "sha256:linux-model", Kind: "model_gguf", Name: "linux-model.gguf", CreatedAt: now}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestProfileYAMLWithRuntimeVariants(t *testing.T) {
+	manager := newProfileConfigManager(t)
+	seedProfileConfigArtifacts(t, manager)
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	profile := createProfileFromYAML(t, server.URL, `
+profileId: llm.chat/multi-target-model
+model: multi-target-model
+kind: llm.chat
+computeCost: 1
+runtime:
+  adapter: llama.cpp-metal
+  modelArtifacts: [sha256:model, sha256:mmproj]
+  contextTokens: 512
+requirements:
+  target: darwin-arm64-metal
+  unifiedMemoryBytes: 6442450944
+  diskBytes: 8589934592
+warmable: true
+runtimeVariants:
+  - variantId: metal
+    target: darwin-arm64-metal
+    adapter: llama.cpp-metal
+    modelArtifacts: [sha256:model, sha256:mmproj]
+  - variantId: cuda
+    target: linux-amd64-cuda
+    adapter: llama.cpp-cuda
+    modelArtifacts: [sha256:linux-model]
+`)
+
+	if len(profile.RuntimeVariants) != 2 {
+		t.Fatalf("expected 2 runtimeVariants, got %d", len(profile.RuntimeVariants))
+	}
+	if profile.RuntimeVariants[0].ID != "metal" {
+		t.Fatalf("variant[0].variantId = %q", profile.RuntimeVariants[0].ID)
+	}
+	if profile.RuntimeVariants[0].Target != "darwin-arm64-metal" {
+		t.Fatalf("variant[0].target = %q", profile.RuntimeVariants[0].Target)
+	}
+	if profile.RuntimeVariants[0].RuntimeAdapter != "llama.cpp-metal" {
+		t.Fatalf("variant[0].adapter = %q", profile.RuntimeVariants[0].RuntimeAdapter)
+	}
+	if strings.Join(profile.RuntimeVariants[0].Artifacts, ",") != "sha256:model,sha256:mmproj" {
+		t.Fatalf("variant[0].artifacts = %+v", profile.RuntimeVariants[0].Artifacts)
+	}
+	if profile.RuntimeVariants[1].ID != "cuda" {
+		t.Fatalf("variant[1].variantId = %q", profile.RuntimeVariants[1].ID)
+	}
+	if profile.RuntimeVariants[1].Target != "linux-amd64-cuda" {
+		t.Fatalf("variant[1].target = %q", profile.RuntimeVariants[1].Target)
+	}
+	if profile.RuntimeVariants[1].RuntimeAdapter != "llama.cpp-cuda" {
+		t.Fatalf("variant[1].adapter = %q", profile.RuntimeVariants[1].RuntimeAdapter)
+	}
+	if strings.Join(profile.RuntimeVariants[1].Artifacts, ",") != "sha256:linux-model" {
+		t.Fatalf("variant[1].artifacts = %+v", profile.RuntimeVariants[1].Artifacts)
+	}
+}
+
+func TestProfileYAMLVariantsInheritParentArtifacts(t *testing.T) {
+	manager := newProfileConfigManager(t)
+	seedProfileConfigArtifacts(t, manager)
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	profile := createProfileFromYAML(t, server.URL, `
+profileId: llm.chat/inherit-artifacts
+model: inherit-artifacts
+kind: llm.chat
+computeCost: 1
+runtime:
+  adapter: llama.cpp-metal
+  modelArtifacts: [sha256:model]
+  contextTokens: 512
+requirements:
+  target: darwin-arm64-metal
+warmable: true
+runtimeVariants:
+  - variantId: metal
+    target: darwin-arm64-metal
+    adapter: llama.cpp-metal
+`)
+
+	if len(profile.RuntimeVariants) != 1 {
+		t.Fatalf("expected 1 runtimeVariant, got %d", len(profile.RuntimeVariants))
+	}
+	normalized := normalizeVariant(profile, profile.RuntimeVariants[0])
+	if strings.Join(normalized.Artifacts, ",") != "sha256:model" {
+		t.Fatalf("normalized variant artifacts = %+v, expected inherited from parent", normalized.Artifacts)
+	}
+}
+
+func TestProfileYAMLVariantsInheritParentRuntime(t *testing.T) {
+	manager := newProfileConfigManager(t)
+	seedProfileConfigArtifacts(t, manager)
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	profile := createProfileFromYAML(t, server.URL, `
+profileId: llm.chat/inherit-runtime
+model: inherit-runtime
+kind: llm.chat
+computeCost: 1
+runtime:
+  adapter: llama.cpp-metal
+  modelArtifacts: [sha256:model]
+  contextTokens: 512
+  llamaCpp:
+    args: ["-ngl", "42", "--threads", "6"]
+requirements:
+  target: darwin-arm64-metal
+warmable: true
+runtimeVariants:
+  - variantId: metal
+    target: darwin-arm64-metal
+    adapter: llama.cpp-metal
+`)
+
+	if len(profile.RuntimeVariants) != 1 {
+		t.Fatalf("expected 1 runtimeVariant, got %d", len(profile.RuntimeVariants))
+	}
+	variant := profile.RuntimeVariants[0]
+	// normalizeVariant should inherit Runtime from parent when variant has no llamaCpp args
+	normalized := normalizeVariant(profile, variant)
+	if strings.Join(normalized.Runtime.LlamaCpp.Args, " ") != "-ngl 42 --threads 6" {
+		t.Fatalf("variant runtime args = %+v, expected inherited from parent", normalized.Runtime.LlamaCpp.Args)
+	}
+}
+
+func TestProfileYAMLVariantRequiresTarget(t *testing.T) {
+	manager := newProfileConfigManager(t)
+	seedProfileConfigArtifacts(t, manager)
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	body := []byte(`
+profileId: llm.chat/no-target-variant
+model: no-target-variant
+kind: llm.chat
+computeCost: 1
+runtime:
+  adapter: llama.cpp-metal
+  modelArtifacts: [sha256:model]
+  contextTokens: 512
+requirements:
+  target: darwin-arm64-metal
+warmable: true
+runtimeVariants:
+  - variantId: bad
+`)
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/api/admin/profiles", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer admin")
+	req.Header.Set("Content-Type", "application/yaml")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for variant without target, got %d", resp.StatusCode)
+	}
+}
+
+func TestProfileYAMLRejectsManagedVariantLlamaArgs(t *testing.T) {
+	manager := newProfileConfigManager(t)
+	seedProfileConfigArtifacts(t, manager)
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	body := []byte(`
+profileId: llm.chat/bad-variant-args
+model: bad-variant-args
+kind: llm.chat
+computeCost: 1
+runtime:
+  adapter: llama.cpp-metal
+  modelArtifacts: [sha256:model]
+  contextTokens: 512
+requirements:
+  target: darwin-arm64-metal
+warmable: true
+runtimeVariants:
+  - variantId: metal
+    target: darwin-arm64-metal
+    adapter: llama.cpp-metal
+    llamaCpp:
+      args: ["--host", "0.0.0.0"]
+`)
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/api/admin/profiles", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer admin")
+	req.Header.Set("Content-Type", "application/yaml")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for variant with managed args, got %d", resp.StatusCode)
+	}
+}
+
+func TestProfileYAMLVariantRequiresAdapter(t *testing.T) {
+	manager := newProfileConfigManager(t)
+	seedProfileConfigArtifacts(t, manager)
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	body := []byte(`
+profileId: llm.chat/no-adapter-variant
+model: no-adapter-variant
+kind: llm.chat
+computeCost: 1
+runtime:
+  adapter: llama.cpp-metal
+  modelArtifacts: [sha256:model]
+  contextTokens: 512
+requirements:
+  target: darwin-arm64-metal
+warmable: true
+runtimeVariants:
+  - variantId: cuda
+    target: linux-amd64-cuda
+`)
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/api/admin/profiles", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer admin")
+	req.Header.Set("Content-Type", "application/yaml")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for variant without adapter, got %d", resp.StatusCode)
+	}
+}
+
+func TestProfileYAMLVariantsRelaxParentRuntime(t *testing.T) {
+	manager := newProfileConfigManager(t)
+	seedProfileConfigArtifacts(t, manager)
+	server := httptest.NewServer(manager.Handler())
+	defer server.Close()
+
+	profile := createProfileFromYAML(t, server.URL, `
+profileId: llm.chat/variants-only
+model: variants-only
+kind: llm.chat
+computeCost: 1
+runtime:
+  adapter: llama.cpp-metal
+  contextTokens: 0
+requirements:
+  target: darwin-arm64-metal
+warmable: true
+runtimeVariants:
+  - variantId: metal
+    target: darwin-arm64-metal
+    adapter: llama.cpp-metal
+    modelArtifacts: [sha256:model]
+    contextTokens: 512
+  - variantId: cuda
+    target: linux-amd64-cuda
+    adapter: llama.cpp-cuda
+    modelArtifacts: [sha256:linux-model]
+    contextTokens: 512
+`)
+
+	if len(profile.RuntimeVariants) != 2 {
+		t.Fatalf("expected 2 runtimeVariants, got %d", len(profile.RuntimeVariants))
 	}
 }

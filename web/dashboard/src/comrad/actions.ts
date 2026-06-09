@@ -32,24 +32,38 @@ export type Actions = {
   setConfirm: (value: ConfirmAction | null) => void
 }
 
+export type ModelEditorVariant = {
+	key: string
+	variantId: string
+	target: string
+	adapter: string
+	contextTokens: string
+	ram: string
+	disk: string
+	llamaArgs: string
+	artifactIds: string[]
+	uploadFiles: File[]
+}
+
 export type ModelEditorForm = {
-  profileId?: string
-  alias: string
-  contextTokens: string
-  ram: string
-  disk: string
-  computeCost: string
-  llamaArgs: string
-  modelArtifactIds?: string[]
-  cachedCount: string
-  warmCount: string
-  autoBalance: boolean
-  minCachedCount: string
-  maxCachedCount: string
-  minWarmCount: string
-  maxWarmCount: string
-  maxCachedProfilesPerNode: string
-  maxWarmProfilesPerNode: string
+	profileId?: string
+	alias: string
+	contextTokens: string
+	ram: string
+	disk: string
+	computeCost: string
+	llamaArgs: string
+	modelArtifactIds?: string[]
+	variants: ModelEditorVariant[]
+	cachedCount: string
+	warmCount: string
+	autoBalance: boolean
+	minCachedCount: string
+	maxCachedCount: string
+	minWarmCount: string
+	maxWarmCount: string
+	maxCachedProfilesPerNode: string
+	maxWarmProfilesPerNode: string
 }
 
 export function splitList(value: string) {
@@ -116,6 +130,7 @@ export async function registerModel(
 ) {
   await saveModel(actions, {
     ...form,
+    variants: [],
     cachedCount: "1",
     warmCount: "1",
     autoBalance: false,
@@ -146,19 +161,58 @@ export async function saveModel(
     )
     return false
   }
-  const modelArtifacts = await resolveModelArtifacts(
-    actions,
-    form,
-    uploadFiles,
-    isEdit,
-    onUploadProgress
-  )
-  if (!modelArtifacts.length) return false
+  const hasVariants = form.variants?.length > 0
+  const hasParentFiles = uploadFiles.length > 0 || (form.modelArtifactIds?.length ?? 0) > 0
+  const modelArtifacts = hasParentFiles || !hasVariants
+    ? await resolveModelArtifacts(
+        actions,
+        form.modelArtifactIds,
+        uploadFiles,
+        isEdit,
+        onUploadProgress
+      )
+    : []
+  if (!modelArtifacts.length && !hasVariants) return false
+  if (hasVariants) {
+    for (let i = 0; i < form.variants.length; i++) {
+      const v = form.variants[i]
+      if (!v.variantId.trim()) {
+        toast.error(translate("profiles.toast.variantIdRequired", { index: i + 1 }, `Variant ${i + 1}: variant ID is required`))
+        return false
+      }
+      if (!v.target.trim()) {
+        toast.error(translate("profiles.toast.variantTargetRequired", { id: v.variantId.trim() || `#${i + 1}` }, `Variant ${v.variantId.trim() || `#${i + 1}`}: target is required`))
+        return false
+      }
+      if (!v.adapter.trim()) {
+        toast.error(translate("profiles.toast.variantAdapterRequired", { id: v.variantId.trim() || `#${i + 1}` }, `Variant ${v.variantId.trim() || `#${i + 1}`}: adapter is required`))
+        return false
+      }
+    }
+  }
+  const variantArtifacts: Array<{ key: string; artifacts: Array<{ artifactId: string }> }> = []
+  if (hasVariants) {
+    for (const v of form.variants) {
+      const hasOwnFiles = v.uploadFiles.length > 0 || (v.artifactIds?.length ?? 0) > 0
+      if (!hasOwnFiles) {
+        variantArtifacts.push({ key: v.key, artifacts: [] })
+        continue
+      }
+      const resolved = await resolveModelArtifacts(
+        actions,
+        v.artifactIds,
+        v.uploadFiles,
+        isEdit,
+        onUploadProgress
+      )
+      variantArtifacts.push({ key: v.key, artifacts: resolved })
+    }
+  }
   const context = Number(form.contextTokens || 4096)
   const profileId =
     form.profileId || `llm.chat/${slug(modelName)}/context-${context}`
   const gib = 1073741824
-  const yaml = `profileId: ${yamlString(profileId)}
+  let yaml = `profileId: ${yamlString(profileId)}
 model: ${yamlString(modelName)}
 kind: llm.chat
 computeCost: ${Number(form.computeCost || 0)}
@@ -175,6 +229,44 @@ requirements:
   diskBytes: ${Number(form.disk || 8) * gib}
 warmable: true
 `
+  if (hasVariants) {
+    yaml += "runtimeVariants:\n"
+    for (let i = 0; i < form.variants.length; i++) {
+      const v = form.variants[i]
+      const resolved = variantArtifacts.find((r) => r.key === v.key)
+      const hasOwnArtifacts = resolved?.artifacts?.length
+      const hasOwnContext = v.contextTokens && Number(v.contextTokens) > 0
+      const hasOwnArgs = v.llamaArgs?.trim()
+      const hasOwnRam = v.ram && Number(v.ram) > 0
+      const hasOwnDisk = v.disk && Number(v.disk) > 0
+      yaml += `  - variantId: ${yamlString(v.variantId)}
+    target: ${yamlString(v.target)}
+    adapter: ${yamlString(v.adapter)}
+`
+      if (hasOwnArtifacts) {
+        yaml += `    modelArtifacts:\n`
+        for (const a of resolved!.artifacts) {
+          yaml += `      - ${yamlString(a.artifactId)}\n`
+        }
+      }
+      if (hasOwnContext) {
+        yaml += `    contextTokens: ${Number(v.contextTokens)}\n`
+      }
+      if (hasOwnArgs) {
+        yaml += `    llamaCpp:\n      args: ${JSON.stringify(splitArgs(v.llamaArgs))}\n`
+      }
+      if (hasOwnRam || hasOwnDisk) {
+        yaml += `    requirements:\n`
+        yaml += `      target: ${yamlString(v.target)}\n`
+        if (hasOwnRam) {
+          yaml += `      unifiedMemoryBytes: ${Number(v.ram) * gib}\n`
+        }
+        if (hasOwnDisk) {
+          yaml += `      diskBytes: ${Number(v.disk) * gib}\n`
+        }
+      }
+    }
+  }
   await actions.api("/api/admin/profiles", {
     method: "POST",
     headers: { "Content-Type": "application/yaml" },
@@ -474,7 +566,7 @@ export function deleteArtifact(artifactId: string, actions: Actions) {
 
 async function resolveModelArtifacts(
   actions: Actions,
-  form: ModelEditorForm,
+  artifactIds: string[] | undefined,
   files: File[],
   isEdit: boolean,
   onUploadProgress?: (progress: UploadProgress) => void
@@ -484,8 +576,8 @@ async function resolveModelArtifacts(
       await uploadModelArtifacts(actions, files, onUploadProgress)
     )
   }
-  if (form.modelArtifactIds?.length) {
-    return form.modelArtifactIds.map((artifactId) => ({ artifactId }))
+  if (artifactIds?.length) {
+    return artifactIds.map((artifactId) => ({ artifactId }))
   }
   toast.error(
     isEdit

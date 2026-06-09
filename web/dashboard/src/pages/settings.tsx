@@ -66,9 +66,7 @@ export function SettingsPage({
         <P2PCard state={state} actions={actions} />
         <ThemeCard />
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <LanguageCard />
-      </div>
+      <LanguageCard />
       <Card>
         <CardHeader>
           <CardTitle>{t("settings.how.title")}</CardTitle>

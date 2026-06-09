@@ -571,6 +571,7 @@ export function PlacementPage({
               undefined,
               "No capacity plan for this model"
             )}
+            rowKey={(a) => a.assignmentId}
             columns={[
               {
                 header: t("placement.column.model", undefined, "Model"),
@@ -661,6 +662,7 @@ export function PlacementPage({
               (item) => !profileId || item.profileId === profileId
             )}
             empty={t("placement.fit.empty", undefined, "No fit results")}
+            rowKey={(f) => `${f.profileId}-${f.slotId}`}
             columns={[
               {
                 header: t("placement.column.model", undefined, "Model"),
@@ -750,6 +752,7 @@ function CachePlanPanel({
                 undefined,
                 "No Worker cache state for this model."
               )}
+              rowKey={(w) => w.nodeId}
               columns={[
                 {
                   header: t("placement.column.worker", undefined, "Worker"),

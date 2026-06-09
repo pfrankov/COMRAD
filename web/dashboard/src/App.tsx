@@ -278,7 +278,10 @@ function useAdminStateStream(
             )
           }
         }
-        nextSocket.onerror = () => nextSocket.close()
+        nextSocket.onerror = (e) => {
+          console.warn("WebSocket error:", e)
+          nextSocket.close()
+        }
         nextSocket.onclose = () => reconnect("reconnecting")
       } catch {
         reconnect(hasConnected ? "reconnecting" : "disconnected")

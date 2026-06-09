@@ -239,6 +239,7 @@ export function UpdatesPage({
                   ),
               },
             ]}
+            rowKey={(n) => n.nodeId}
           />
         </CardContent>
       </Card>
@@ -259,6 +260,7 @@ export function UpdatesPage({
           <DataTable
             items={state.updates ?? []}
             empty={t("updates.records.empty", undefined, "No update records")}
+            rowKey={(u) => u.updateId}
             columns={[
               {
                 header: t("updates.column.update", undefined, "Update"),

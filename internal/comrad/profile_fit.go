@@ -100,6 +100,9 @@ func normalizeVariant(profile WorkloadProfile, variant RuntimeModelVariant) Runt
 	if variant.LLM == nil {
 		variant.LLM = profile.LLM
 	}
+	if len(variant.Runtime.LlamaCpp.Args) == 0 {
+		variant.Runtime = profile.Runtime
+	}
 	if variant.Target == "" && variant.Requirements != nil {
 		variant.Target = variant.Requirements.Target
 	}

@@ -58,6 +58,7 @@ export function ArtifactsPage({
           <DataTable
             items={state.artifacts ?? []}
             empty={t("artifacts.empty", undefined, "No artifacts registered")}
+            rowKey={(a) => a.artifactId}
             columns={[
               {
                 header: t("artifacts.column.artifact", undefined, "Artifact"),

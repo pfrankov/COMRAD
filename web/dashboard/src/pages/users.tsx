@@ -220,6 +220,7 @@ function UserDirectory({
         <DataTable
           items={users}
           empty={t("users.empty", undefined, "No API clients")}
+          rowKey={(u) => u.userId}
           columns={[
             {
               header: t("users.column.client", undefined, "API client"),
@@ -420,6 +421,7 @@ function UserDetailDialog({
             undefined,
             "No API keys for this client"
           )}
+          rowKey={(k) => k.apiKeyId}
           columns={[
             {
               header: t("users.keys.column.key", undefined, "Key"),
@@ -703,6 +705,7 @@ function LedgerTable({
         <DataTable
           items={[...visible].reverse()}
           empty={t("users.ledger.empty", undefined, "No ledger entries")}
+          rowKey={(e) => e.ledgerEntryId}
           columns={[
             {
               header: t("users.ledger.column.entry", undefined, "Entry"),

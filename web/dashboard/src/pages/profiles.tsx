@@ -63,6 +63,7 @@ import {
   saveModel,
   type Actions,
   type ModelEditorForm,
+  type ModelEditorVariant,
   type UploadProgress,
 } from "@/comrad/actions"
 import type { Artifact, Assignment, Policy, Profile, StateResponse } from "@/types"
@@ -442,6 +443,7 @@ function ModelTechnicalDetails({
           undefined,
           "No slot assignments"
         )}
+        rowKey={(a) => a.assignmentId}
         columns={[
           {
             header: t("profiles.assignments.slot", undefined, "Slot"),
@@ -851,6 +853,13 @@ function ModelEditorDialog(props: {
                 </Field>
               </FieldGroup>
             ) : null}
+            <VariantEditor
+              variants={props.form.variants}
+              setVariants={(variants) => update("variants", variants)}
+              artifacts={props.artifacts}
+              actions={props.actions}
+              t={props.t}
+            />
             <Card className="border-dashed">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
@@ -996,6 +1005,249 @@ function UploadProgressPanel({
   )
 }
 
+function VariantEditor({
+  variants,
+  setVariants,
+  artifacts,
+  actions,
+  t,
+}: {
+  variants: ModelEditorVariant[]
+  setVariants: (variants: ModelEditorVariant[]) => void
+  artifacts: Artifact[]
+  actions: Actions
+  t: TFunction
+}) {
+  const nextKey = () => `variant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+  const addVariant = () =>
+    setVariants([
+      ...variants,
+      {
+        key: nextKey(),
+        variantId: "",
+        target: "",
+        adapter: "",
+        contextTokens: "",
+        ram: "",
+        disk: "",
+        llamaArgs: "",
+        artifactIds: [],
+        uploadFiles: [],
+      },
+    ])
+  const removeVariant = (key: string) => {
+    const target = variants.find((v) => v.key === key)
+    const label = target?.variantId || target?.target || t("profiles.variants.newVariant", undefined, "New variant")
+    actions.setConfirm({
+      title: t("profiles.variants.confirmRemove", { id: label }, `Remove variant "${label}"?`),
+      body: "",
+      variant: "destructive",
+      run: async () => {
+        setVariants(variants.filter((v) => v.key !== key))
+      },
+    })
+  }
+  const updateVariant = (key: string, update: Partial<ModelEditorVariant>) =>
+    setVariants(
+      variants.map((v) => (v.key === key ? { ...v, ...update } : v))
+    )
+  return (
+    <Card className="border-dashed">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <Settings2Icon data-icon="inline-start" />
+          {t("profiles.variants.title", undefined, "Platform variants")}
+        </CardTitle>
+        <CardDescription>
+          {t(
+            "profiles.variants.description",
+            undefined,
+            "Add platform-specific model variants for different operating systems or runtime backends. Each variant can use its own model files and llama.cpp arguments."
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {variants.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "profiles.variants.empty",
+              undefined,
+              "No variants. The model will use the same files and settings for all platforms."
+            )}
+          </p>
+        )}
+        {variants.map((variant) => (
+          <VariantCard
+            key={variant.key}
+            variant={variant}
+            artifacts={artifacts}
+            onChange={(update) => updateVariant(variant.key, update)}
+            onRemove={() => removeVariant(variant.key)}
+            t={t}
+          />
+        ))}
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start gap-2"
+          onClick={addVariant}
+        >
+          <PlusIcon data-icon="inline-start" />
+          {t("profiles.variants.add", undefined, "Add variant")}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function VariantCard({
+  variant,
+  artifacts,
+  onChange,
+  onRemove,
+  t,
+}: {
+  variant: ModelEditorVariant
+  artifacts: Artifact[]
+  onChange: (update: Partial<ModelEditorVariant>) => void
+  onRemove: () => void
+  t: TFunction
+}) {
+  return (
+    <div className="rounded-lg border bg-muted/40 p-3">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-sm font-medium">
+          {variant.variantId || t("profiles.variants.newVariant", undefined, "New variant")}
+        </span>
+        <Button variant="ghost" size="sm" onClick={onRemove}>
+          <Trash2Icon data-icon="inline-start" />
+          {t("common.remove", undefined, "Remove")}
+        </Button>
+      </div>
+      <FieldGroup className="grid gap-3 md:grid-cols-3">
+        <Field>
+          <FieldLabel>
+            {t("profiles.variants.variantId", undefined, "Variant ID")}
+          </FieldLabel>
+          <Input
+            value={variant.variantId}
+            onChange={(e) => onChange({ variantId: e.target.value })}
+            placeholder="metal"
+          />
+        </Field>
+        <Field>
+          <FieldLabel>
+            {t("profiles.variants.target", undefined, "Target")}
+          </FieldLabel>
+          <Input
+            value={variant.target}
+            onChange={(e) => onChange({ target: e.target.value })}
+            placeholder="darwin-arm64-metal"
+          />
+        </Field>
+        <Field>
+          <FieldLabel>
+            {t("profiles.variants.adapter", undefined, "Adapter")}
+          </FieldLabel>
+          <Input
+            value={variant.adapter}
+            onChange={(e) => onChange({ adapter: e.target.value })}
+            placeholder="llama.cpp-metal"
+          />
+        </Field>
+      </FieldGroup>
+      <FieldGroup className="grid gap-3 md:grid-cols-3 mt-3">
+        <Field>
+          <FieldLabel>
+            {t(
+              "profiles.variants.contextTokens",
+              undefined,
+              "Context tokens (override)"
+            )}
+          </FieldLabel>
+          <Input
+            type="number"
+            value={variant.contextTokens}
+            onChange={(e) => onChange({ contextTokens: e.target.value })}
+            placeholder={t("profiles.variants.inherit", undefined, "inherit")}
+          />
+        </Field>
+        <Field>
+          <FieldLabel>
+            {t("profiles.variants.ram", undefined, "Memory GiB (override)")}
+          </FieldLabel>
+          <Input
+            type="number"
+            value={variant.ram}
+            onChange={(e) => onChange({ ram: e.target.value })}
+            placeholder={t("profiles.variants.inherit", undefined, "inherit")}
+          />
+        </Field>
+        <Field>
+          <FieldLabel>
+            {t("profiles.variants.disk", undefined, "Disk GiB (override)")}
+          </FieldLabel>
+          <Input
+            type="number"
+            value={variant.disk}
+            onChange={(e) => onChange({ disk: e.target.value })}
+            placeholder={t("profiles.variants.inherit", undefined, "inherit")}
+          />
+        </Field>
+      </FieldGroup>
+      <FieldGroup className="grid gap-3 md:grid-cols-2 mt-3">
+        <Field>
+          <FieldLabel>
+            {t(
+              "profiles.variants.uploadFiles",
+              undefined,
+              "Upload variant files (optional)"
+            )}
+          </FieldLabel>
+          <Input
+            type="file"
+            multiple
+            onChange={(event) =>
+              onChange({
+                uploadFiles: Array.from(event.target.files ?? []),
+              })
+            }
+          />
+        </Field>
+        <Field>
+          <FieldLabel>
+            {t(
+              "profiles.variants.llamaArgs",
+              undefined,
+              "llama.cpp args (override)"
+            )}
+          </FieldLabel>
+          <Input
+            value={variant.llamaArgs}
+            onChange={(e) => onChange({ llamaArgs: e.target.value })}
+            placeholder={t("profiles.variants.inherit", undefined, "inherit")}
+          />
+        </Field>
+      </FieldGroup>
+      {variant.artifactIds.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="font-medium">
+            {t("profiles.linkedFiles.title", undefined, "Linked model files")}:
+          </span>
+          {variant.artifactIds.map((id) => {
+            const artifact = artifacts.find((a) => a.artifactId === id)
+            return (
+              <code key={id} className="rounded bg-muted px-1.5 py-0.5">
+                {artifact?.name || short(id)}
+              </code>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function emptyModelForm(): ModelEditorForm {
   return {
     alias: "",
@@ -1004,6 +1256,7 @@ function emptyModelForm(): ModelEditorForm {
     disk: "8",
     computeCost: "0",
     llamaArgs: "-ngl 99",
+    variants: [],
     cachedCount: "1",
     warmCount: "1",
     autoBalance: false,
@@ -1022,6 +1275,26 @@ function formFromProfile(
 ): ModelEditorForm {
   const counts = assignmentCounts(profile.profileId, state.assignments ?? [])
   const policy = policyForProfile(profile.profileId, state.policies ?? [])
+  const artifacts = state.artifacts ?? []
+  const variants: ModelEditorVariant[] = (profile.runtimeVariants || []).map(
+    (v, i) => ({
+      key: `variant-${i}`,
+      variantId: v.variantId || `variant-${i}`,
+      target: v.target || "",
+      adapter: v.runtimeAdapter || "",
+      contextTokens: String(v.llm?.contextTokens || ""),
+      ram: bytesToGiB(
+        v.requirements?.unifiedMemoryBytes || v.requirements?.ramBytes
+      ),
+      disk: bytesToGiB(v.requirements?.diskBytes),
+      llamaArgs: v.runtime?.llamaCpp?.args?.join(" ") || "",
+      artifactIds: modelArtifactIdsFor(
+        v.artifacts || profile.artifacts || [],
+        artifacts
+      ),
+      uploadFiles: [],
+    })
+  )
   return {
     ...emptyModelForm(),
     profileId: profile.profileId,
@@ -1033,7 +1306,8 @@ function formFromProfile(
     disk: bytesToGiB(profile.requirements?.diskBytes),
     computeCost: String(profile.computeCost ?? 0),
     llamaArgs: profile.runtime?.llamaCpp?.args?.join(" ") || "",
-    modelArtifactIds: modelArtifactIds(profile, state.artifacts ?? []),
+    modelArtifactIds: modelArtifactIds(profile, artifacts),
+    variants,
     cachedCount: String(policy?.cachedCount ?? (counts.desiredCached || 1)),
     warmCount: String(policy?.warmCount ?? (counts.desiredWarm || 1)),
     autoBalance: Boolean(policy?.autoBalance),
@@ -1055,7 +1329,10 @@ function countField(value?: number) {
 }
 
 function modelArtifactIds(profile: Profile, artifacts: Artifact[]) {
-  const ids = profile.artifacts ?? []
+  return modelArtifactIdsFor(profile.artifacts ?? [], artifacts)
+}
+
+function modelArtifactIdsFor(ids: string[], artifacts: Artifact[]) {
   const modelIds = ids.filter((id) => {
     const artifact = artifacts.find((item) => item.artifactId === id)
     return !artifact?.kind || artifact.kind.startsWith("model_")
@@ -1075,7 +1352,8 @@ function modelReady(profile: Profile, assignments: Assignment[]) {
 
 function concreteArtifacts(profile: Profile, artifacts: Artifact[]) {
   const ids = profileVariants(profile).flatMap(
-    (variant) => variant.artifacts || profile.artifacts || []
+    (variant) =>
+      variant.artifacts?.length ? variant.artifacts : profile.artifacts || []
   )
   return [...new Set(ids)].map((id) => {
     const artifact = artifacts.find((item) => item.artifactId === id)

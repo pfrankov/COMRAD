@@ -24,10 +24,12 @@ export function DataTable<T>({
   columns,
   items,
   empty,
+  rowKey,
 }: {
   columns: Column<T>[]
   items: T[]
   empty?: string
+  rowKey?: (item: T) => string
 }) {
   const { t } = useI18n()
   if (!items.length) {
@@ -52,7 +54,7 @@ export function DataTable<T>({
         </TableHeader>
         <TableBody>
           {items.map((item, index) => (
-            <TableRow key={index}>
+            <TableRow key={rowKey ? rowKey(item) : index}>
               {columns.map((column) => (
                 <TableCell
                   key={column.header}

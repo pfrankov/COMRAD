@@ -194,6 +194,7 @@ export function TasksPage({
               <DataTable
                 items={tasks}
                 empty={t("tasks.empty", undefined, "No requests")}
+                rowKey={(t) => t.taskId}
                 columns={[
                   {
                     header: t("tasks.column.task", undefined, "Request"),
@@ -321,6 +322,7 @@ export function TasksPage({
                   undefined,
                   "No requests by client"
                 )}
+                rowKey={(s) => s.userId}
                 columns={[
                   {
                     header: t(
