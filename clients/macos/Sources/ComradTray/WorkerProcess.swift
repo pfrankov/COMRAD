@@ -29,6 +29,7 @@ final class WorkerProcess {
     private let errLogFileURL: URL
     private let workerBinaryURL: URL
     private let pidFileURL: URL
+    private var pipeWriteHandle: FileHandle?
 
     init(workerBinaryURL: URL, dataDir: URL) {
         self.workerBinaryURL = workerBinaryURL
@@ -82,6 +83,8 @@ final class WorkerProcess {
         let proc = process
         process = nil
         updateState(.stopping)
+        pipeWriteHandle?.closeFile()
+        pipeWriteHandle = nil
         if let proc, proc.isRunning {
             proc.terminationHandler = nil  // Prevent the async handler from treating this as a crash
             proc.terminate()
@@ -104,6 +107,13 @@ final class WorkerProcess {
         proc.environment = buildEnvironment(env: env)
         proc.standardOutput = logHandle()
         proc.standardError = errLogHandle()
+
+        // Create a pipe whose write end we keep open. The worker monitors its
+        // stdin for EOF — when this process dies (even via SIGKILL) the pipe
+        // closes and the worker shuts itself down cleanly.
+        let pipe = Pipe()
+        proc.standardInput = pipe.fileHandleForReading
+        pipeWriteHandle = pipe.fileHandleForWriting
 
         proc.terminationHandler = { [weak self] p in
             let exitCode = p.terminationStatus

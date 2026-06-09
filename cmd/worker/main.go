@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -38,6 +39,14 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Exit when stdin is closed — the tray app holds the write end of a pipe
+	// as our stdin; when it dies (even via SIGKILL) the pipe closes and we exit.
+	go func() {
+		io.Copy(io.Discard, os.Stdin)
+		stop()
+	}()
+
 	log.Printf("comrad worker %s connecting to %s", comrad.Version, cfg.ManagerURL)
 	statusAddr := os.Getenv("COMRAD_WORKER_STATUS_ADDR")
 	if statusAddr != "" {
