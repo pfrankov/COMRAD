@@ -700,5 +700,9 @@
   "settings.clientKey.error": "Falha ao carregar",
   "settings.clientKey.noToken": "Salve o token de administrador para revelar os detalhes de conexão do cliente.",
   "settings.clientKey.urlLabel": "URL do Manager",
-  "settings.clientKey.keyLabel": "Chave API"
+  "settings.clientKey.keyLabel": "Chave API",
+  "settings.workerConnection.title": "Conexão do worker",
+  "settings.workerConnection.description": "Insira estes dados no app da bandeja para conectar um nó worker.",
+  "settings.workerConnection.noToken": "Salve o token de administrador para revelar os detalhes de conexão do worker.",
+  "settings.workerConnection.tokenLabel": "Token"
 }

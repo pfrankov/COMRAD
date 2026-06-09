@@ -700,5 +700,9 @@
   "settings.clientKey.error": "Laden fehlgeschlagen",
   "settings.clientKey.noToken": "Speichern Sie das Admin-Token, um die Client-Verbindungsdaten anzuzeigen.",
   "settings.clientKey.urlLabel": "Manager-URL",
-  "settings.clientKey.keyLabel": "API-Schlüssel"
+  "settings.clientKey.keyLabel": "API-Schlüssel",
+  "settings.workerConnection.title": "Worker-Verbindung",
+  "settings.workerConnection.description": "Diese Daten in der Tray-App eingeben, um einen Worker-Knoten zu verbinden.",
+  "settings.workerConnection.noToken": "Speichern Sie das Admin-Token, um die Worker-Verbindungsdaten anzuzeigen.",
+  "settings.workerConnection.tokenLabel": "Token"
 }

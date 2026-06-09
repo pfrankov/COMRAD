@@ -68,6 +68,7 @@ export function SettingsPage({
           saveAdminToken={saveAdminToken}
         />
         <ClientKeyCard actions={actions} adminToken={adminToken} />
+        <WorkerConnectionCard actions={actions} adminToken={adminToken} />
         <P2PCard state={state} actions={actions} />
         <ThemeCard />
       </div>
@@ -565,6 +566,168 @@ function ClientKeyCard({
                   size="icon"
                   variant="outline"
                   disabled={!key}
+                  onClick={() => void handleCopy()}
+                  aria-label={t("common.copy", undefined, "Copy")}
+                >
+                  {copied ? (
+                    <CheckIcon className="size-4 text-status-running" />
+                  ) : (
+                    <CopyIcon className="size-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function WorkerConnectionCard({
+  actions,
+  adminToken,
+}: {
+  actions: Actions
+  adminToken: string
+}) {
+  const { t } = useI18n()
+  const [workerToken, setWorkerToken] = useState<string | null>(null)
+  const [managerUrl, setManagerUrl] = useState<string | null>(null)
+  const [visible, setVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [copiedUrl, setCopiedUrl] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    setWorkerToken(null)
+    setManagerUrl(null)
+    setVisible(false)
+    setError("")
+    if (!adminToken) return
+    setLoading(true)
+    actions
+      .fetchJSON<{ managerUrl: string; workerToken: string }>("/api/admin/worker-join")
+      .then((body) => {
+        setWorkerToken(body.workerToken)
+        setManagerUrl(body.managerUrl)
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false))
+  }, [actions, adminToken])
+
+  const handleCopy = async () => {
+    if (!workerToken) return
+    await navigator.clipboard.writeText(workerToken)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleCopyUrl = async () => {
+    if (!managerUrl) return
+    await navigator.clipboard.writeText(managerUrl)
+    setCopiedUrl(true)
+    setTimeout(() => setCopiedUrl(false), 2000)
+  }
+
+  const displayToken = !adminToken
+    ? ""
+    : loading
+      ? t("settings.clientKey.loading", undefined, "Loading…")
+      : error
+        ? t("settings.clientKey.error", undefined, "Failed to load")
+        : visible
+          ? (workerToken ?? "")
+          : workerToken
+            ? "•".repeat(Math.min(workerToken.length, 32))
+            : ""
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <NetworkIcon data-icon="inline-start" />
+          {t("settings.workerConnection.title", undefined, "Worker connection")}
+        </CardTitle>
+        <CardDescription>
+          {t(
+            "settings.workerConnection.description",
+            undefined,
+            "Enter these in the tray app settings to connect a worker node."
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {!adminToken ? (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "settings.workerConnection.noToken",
+              undefined,
+              "Save the admin token to reveal worker connection details."
+            )}
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">
+                {t("settings.clientKey.urlLabel", undefined, "Manager URL")}
+              </span>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs">
+                  {loading
+                    ? t("settings.clientKey.loading", undefined, "Loading…")
+                    : error
+                      ? t("settings.clientKey.error", undefined, "Failed to load")
+                      : (managerUrl ?? "")}
+                </code>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  disabled={!managerUrl}
+                  onClick={() => void handleCopyUrl()}
+                  aria-label={t("common.copy", undefined, "Copy")}
+                >
+                  {copiedUrl ? (
+                    <CheckIcon className="size-4 text-status-running" />
+                  ) : (
+                    <CopyIcon className="size-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">
+                {t("settings.workerConnection.tokenLabel", undefined, "Token")}
+              </span>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs">
+                  {displayToken}
+                </code>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  disabled={!workerToken}
+                  onClick={() => setVisible((v) => !v)}
+                  aria-label={
+                    visible
+                      ? t("common.hide", undefined, "Hide")
+                      : t("common.show", undefined, "Show")
+                  }
+                >
+                  {visible ? (
+                    <EyeOffIcon className="size-4" />
+                  ) : (
+                    <EyeIcon className="size-4" />
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  disabled={!workerToken}
                   onClick={() => void handleCopy()}
                   aria-label={t("common.copy", undefined, "Copy")}
                 >

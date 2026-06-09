@@ -700,5 +700,9 @@
   "settings.clientKey.error": "Échec du chargement",
   "settings.clientKey.noToken": "Enregistrez le token administrateur pour afficher les détails de connexion client.",
   "settings.clientKey.urlLabel": "URL du Manager",
-  "settings.clientKey.keyLabel": "Clé API"
+  "settings.clientKey.keyLabel": "Clé API",
+  "settings.workerConnection.title": "Connexion worker",
+  "settings.workerConnection.description": "Entrez ces informations dans l'app de barre pour connecter un nœud worker.",
+  "settings.workerConnection.noToken": "Enregistrez le token administrateur pour afficher les détails de connexion worker.",
+  "settings.workerConnection.tokenLabel": "Token"
 }

@@ -700,5 +700,9 @@
   "settings.clientKey.error": "Error al cargar",
   "settings.clientKey.noToken": "Guarda el token de administrador para revelar los datos de conexión del cliente.",
   "settings.clientKey.urlLabel": "URL del Manager",
-  "settings.clientKey.keyLabel": "Clave API"
+  "settings.clientKey.keyLabel": "Clave API",
+  "settings.workerConnection.title": "Conexión de worker",
+  "settings.workerConnection.description": "Introduce estos datos en la app de bandeja para conectar un nodo worker.",
+  "settings.workerConnection.noToken": "Guarda el token de administrador para revelar los datos de conexión del worker.",
+  "settings.workerConnection.tokenLabel": "Token"
 }

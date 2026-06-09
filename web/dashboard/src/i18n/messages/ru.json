@@ -700,5 +700,9 @@
   "settings.clientKey.error": "Не удалось загрузить",
   "settings.clientKey.noToken": "Сохраните токен администратора, чтобы показать данные подключения.",
   "settings.clientKey.urlLabel": "URL менеджера",
-  "settings.clientKey.keyLabel": "API-ключ"
+  "settings.clientKey.keyLabel": "API-ключ",
+  "settings.workerConnection.title": "Подключение воркера",
+  "settings.workerConnection.description": "Введите эти данные в настройках трей-приложения для подключения воркера.",
+  "settings.workerConnection.noToken": "Сохраните токен администратора, чтобы показать данные подключения воркера.",
+  "settings.workerConnection.tokenLabel": "Токен"
 }

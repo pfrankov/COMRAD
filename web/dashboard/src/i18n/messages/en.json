@@ -700,5 +700,9 @@
   "settings.clientKey.error": "Failed to load",
   "settings.clientKey.noToken": "Save the admin token to reveal client connection details.",
   "settings.clientKey.urlLabel": "Manager URL",
-  "settings.clientKey.keyLabel": "API key"
+  "settings.clientKey.keyLabel": "API key",
+  "settings.workerConnection.title": "Worker connection",
+  "settings.workerConnection.description": "Enter these in the tray app settings to connect a worker node.",
+  "settings.workerConnection.noToken": "Save the admin token to reveal worker connection details.",
+  "settings.workerConnection.tokenLabel": "Token"
 }

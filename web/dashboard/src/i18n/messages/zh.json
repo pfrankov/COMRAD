@@ -700,5 +700,9 @@
   "settings.clientKey.error": "加载失败",
   "settings.clientKey.noToken": "请保存管理员令牌以显示客户端连接详情。",
   "settings.clientKey.urlLabel": "Manager URL",
-  "settings.clientKey.keyLabel": "API 密钥"
+  "settings.clientKey.keyLabel": "API 密钥",
+  "settings.workerConnection.title": "Worker 连接",
+  "settings.workerConnection.description": "在托盘应用设置中输入这些信息以连接 Worker 节点。",
+  "settings.workerConnection.noToken": "请保存管理员令牌以显示 Worker 连接详情。",
+  "settings.workerConnection.tokenLabel": "令牌"
 }
