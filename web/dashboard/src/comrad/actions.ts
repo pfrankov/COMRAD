@@ -326,6 +326,25 @@ export function deleteModel(
   })
 }
 
+export function deleteNode(nodeId: string, actions: Actions) {
+  actions.setConfirm({
+    title: translate("nodes.confirm.delete.title", undefined, "Delete worker"),
+    body: translate(
+      "nodes.confirm.delete.body",
+      { worker: nodeId },
+      `This permanently removes ${nodeId} from the Manager. Only offline or disabled workers can be deleted.`
+    ),
+    confirmLabel: translate("nodes.action.delete", undefined, "Delete worker"),
+    variant: "destructive",
+    run: async () => {
+      await actions.api(
+        `/api/admin/nodes?nodeId=${encodeURIComponent(nodeId)}`,
+        { method: "DELETE" }
+      )
+    },
+  })
+}
+
 export function drainNode(nodeId: string, actions: Actions) {
   actions.setConfirm({
     title: translate(

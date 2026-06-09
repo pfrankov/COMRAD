@@ -24,6 +24,7 @@ import { StatusBadge } from "@/components/comrad/status-badge"
 import { useI18n, type TFunction } from "@/i18n/i18n-provider"
 import { fmtBytes, human, short, timeAgo } from "@/lib/comrad"
 import {
+  deleteNode,
   drainNode,
   enableNode,
   setCacheArtifactAction,
@@ -240,6 +241,15 @@ function NodeCard({
                 undefined,
                 "Unban after healthcheck"
               )}
+            </Button>
+          ) : null}
+          {node.state !== "online" ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => deleteNode(node.nodeId, actions)}
+            >
+              {t("nodes.action.delete", undefined, "Delete worker")}
             </Button>
           ) : null}
         </div>

@@ -18,9 +18,46 @@ func (m *Manager) handleAdminNodes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, SortedNodes(m.store.Snapshot()))
 	case http.MethodPost:
 		m.handleAdminNodeUpdate(w, r)
+	case http.MethodDelete:
+		m.handleAdminNodeDelete(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func (m *Manager) handleAdminNodeDelete(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.URL.Query().Get("nodeId")
+	if nodeID == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "nodeId is required")
+		return
+	}
+	if err := m.store.Update(func(db *Database) error {
+		node, ok := db.Nodes[nodeID]
+		if !ok {
+			return artifactDeleteError{code: "not_found", message: "node not found"}
+		}
+		if node.State == NodeStateOnline {
+			return artifactDeleteError{code: "node_online", message: "cannot delete an online node"}
+		}
+		delete(db.Nodes, nodeID)
+		for id, slot := range db.Slots {
+			if slot.NodeID == nodeID {
+				delete(db.Slots, id)
+			}
+		}
+		for id, assignment := range db.Assignments {
+			if assignment.NodeID == nodeID {
+				delete(db.Assignments, id)
+			}
+		}
+		db.Audit = append(db.Audit, AuditEvent{ID: NewID("aud"), Type: "admin.node.deleted", Actor: "admin", Subject: nodeID, CreatedAt: time.Now().UTC()})
+		return nil
+	}); err != nil {
+		writeProfileDeleteError(w, err)
+		return
+	}
+	m.replanAndDispatch()
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 func (m *Manager) handleAdminNodeUpdate(w http.ResponseWriter, r *http.Request) {
