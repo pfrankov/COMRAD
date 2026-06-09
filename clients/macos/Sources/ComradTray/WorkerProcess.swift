@@ -38,17 +38,33 @@ final class WorkerProcess {
         killLeftoverWorker()
     }
 
-    // Kills any worker process left over from a previous session (crash / force-quit).
+    // Kills any worker processes left over from a previous session (crash / force-quit).
+    // Uses the PID file first, then falls back to killing all processes with the same binary name.
     private func killLeftoverWorker() {
-        guard let data = try? Data(contentsOf: pidFileURL),
-              let pidString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              let pid = Int32(pidString), pid > 0 else {
-            return
-        }
-        if kill(pid, 0) == 0 {
-            kill(pid, SIGTERM)
+        var killedViaPID = false
+        if let data = try? Data(contentsOf: pidFileURL),
+           let pidString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           let pid = Int32(pidString), pid > 0 {
+            if kill(pid, 0) == 0 {
+                kill(pid, SIGTERM)
+            }
+            killedViaPID = true
         }
         try? FileManager.default.removeItem(at: pidFileURL)
+
+        // Fallback: kill any leftover processes running the same binary (e.g. after a crash
+        // that lost the PID file, or accumulated orphans from multiple restarts).
+        let binaryPath = workerBinaryURL.path
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        task.arguments = ["-TERM", "-f", binaryPath]
+        try? task.run()
+        task.waitUntilExit()
+
+        // Give processes a moment to exit before we launch a fresh one.
+        if killedViaPID || (task.terminationStatus == 0) {
+            Thread.sleep(forTimeInterval: 0.3)
+        }
     }
 
     // Must be called on the main thread.
