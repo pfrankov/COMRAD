@@ -690,5 +690,13 @@
   "settings.p2p.status": "Active",
   "settings.p2p.statusOff": "Off",
   "settings.p2p.saveFailed": "Failed to update P2P setting",
-  "settings.p2p.saved": "P2P setting updated"
+  "settings.p2p.saved": "P2P setting updated",
+  "common.copy": "コピー",
+  "common.hide": "非表示",
+  "common.show": "表示",
+  "settings.clientKey.title": "クライアントキー",
+  "settings.clientKey.description": "このキーをクライアントと共有して、このManagerに接続できるようにします。",
+  "settings.clientKey.loading": "読み込み中…",
+  "settings.clientKey.error": "読み込み失敗",
+  "settings.clientKey.noToken": "管理者トークンを保存してクライアントキーを表示してください。"
 }

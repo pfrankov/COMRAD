@@ -690,5 +690,13 @@
   "settings.p2p.status": "活跃",
   "settings.p2p.statusOff": "已关闭",
   "settings.p2p.saveFailed": "更新 P2P 设置失败",
-  "settings.p2p.saved": "P2P 设置已更新"
+  "settings.p2p.saved": "P2P 设置已更新",
+  "common.copy": "复制",
+  "common.hide": "隐藏",
+  "common.show": "显示",
+  "settings.clientKey.title": "客户端密钥",
+  "settings.clientKey.description": "将此密钥分享给客户端，使其能够连接到此 Manager。",
+  "settings.clientKey.loading": "加载中…",
+  "settings.clientKey.error": "加载失败",
+  "settings.clientKey.noToken": "请保存管理员令牌以显示客户端密钥。"
 }

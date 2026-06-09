@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react"
 
 import {
+  CheckIcon,
+  CopyIcon,
   CpuIcon,
+  EyeIcon,
+  EyeOffIcon,
   FileCode2Icon,
   KeyRoundIcon,
   MonitorIcon,
@@ -63,6 +67,7 @@ export function SettingsPage({
           adminToken={adminToken}
           saveAdminToken={saveAdminToken}
         />
+        <ClientKeyCard actions={actions} adminToken={adminToken} />
         <P2PCard state={state} actions={actions} />
         <ThemeCard />
       </div>
@@ -413,6 +418,122 @@ function YamlValue({ value }: { value: string }) {
       {leading}
       <span className={className}>{trimmed}</span>
     </>
+  )
+}
+
+function ClientKeyCard({
+  actions,
+  adminToken,
+}: {
+  actions: Actions
+  adminToken: string
+}) {
+  const { t } = useI18n()
+  const [key, setKey] = useState<string | null>(null)
+  const [visible, setVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    setKey(null)
+    setVisible(false)
+    setError("")
+    if (!adminToken) return
+    setLoading(true)
+    actions
+      .fetchJSON<{ clientKey: string }>("/api/admin/client-key")
+      .then((body) => setKey(body.clientKey))
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false))
+  }, [actions, adminToken])
+
+  const handleCopy = async () => {
+    if (!key) return
+    await navigator.clipboard.writeText(key)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const displayValue = !adminToken
+    ? ""
+    : loading
+      ? t("settings.clientKey.loading", undefined, "Loading…")
+      : error
+        ? t("settings.clientKey.error", undefined, "Failed to load")
+        : visible
+          ? (key ?? "")
+          : key
+            ? "•".repeat(Math.min(key.length, 32))
+            : ""
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRoundIcon data-icon="inline-start" />
+          {t("settings.clientKey.title", undefined, "Client key")}
+        </CardTitle>
+        <CardDescription>
+          {t(
+            "settings.clientKey.description",
+            undefined,
+            "Share this key with clients so they can connect to this Manager."
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {!adminToken ? (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "settings.clientKey.noToken",
+              undefined,
+              "Save the admin token to reveal the client key."
+            )}
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs">
+                {displayValue}
+              </code>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                disabled={!key}
+                onClick={() => setVisible((v) => !v)}
+                aria-label={
+                  visible
+                    ? t("common.hide", undefined, "Hide")
+                    : t("common.show", undefined, "Show")
+                }
+              >
+                {visible ? (
+                  <EyeOffIcon className="size-4" />
+                ) : (
+                  <EyeIcon className="size-4" />
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                disabled={!key}
+                onClick={() => void handleCopy()}
+                aria-label={t("common.copy", undefined, "Copy")}
+              >
+                {copied ? (
+                  <CheckIcon className="size-4 text-status-running" />
+                ) : (
+                  <CopyIcon className="size-4" />
+                )}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

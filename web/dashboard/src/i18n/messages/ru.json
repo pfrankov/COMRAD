@@ -690,5 +690,13 @@
   "settings.p2p.status": "Активно",
   "settings.p2p.statusOff": "Выключено",
   "settings.p2p.saveFailed": "Не удалось обновить настройку P2P",
-  "settings.p2p.saved": "Настройка P2P обновлена"
+  "settings.p2p.saved": "Настройка P2P обновлена",
+  "common.copy": "Копировать",
+  "common.hide": "Скрыть",
+  "common.show": "Показать",
+  "settings.clientKey.title": "Ключ клиента",
+  "settings.clientKey.description": "Передайте этот ключ клиентам, чтобы они могли подключиться к этому менеджеру.",
+  "settings.clientKey.loading": "Загрузка…",
+  "settings.clientKey.error": "Не удалось загрузить",
+  "settings.clientKey.noToken": "Сохраните токен администратора, чтобы показать ключ клиента."
 }

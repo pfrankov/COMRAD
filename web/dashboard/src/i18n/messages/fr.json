@@ -690,5 +690,13 @@
   "settings.p2p.status": "Active",
   "settings.p2p.statusOff": "Off",
   "settings.p2p.saveFailed": "Failed to update P2P setting",
-  "settings.p2p.saved": "P2P setting updated"
+  "settings.p2p.saved": "P2P setting updated",
+  "common.copy": "Copier",
+  "common.hide": "Masquer",
+  "common.show": "Afficher",
+  "settings.clientKey.title": "Clé client",
+  "settings.clientKey.description": "Partagez cette clé avec les clients pour qu'ils puissent se connecter à ce Manager.",
+  "settings.clientKey.loading": "Chargement…",
+  "settings.clientKey.error": "Échec du chargement",
+  "settings.clientKey.noToken": "Enregistrez le token administrateur pour révéler la clé client."
 }

@@ -82,6 +82,14 @@ type ObservabilityConfigYAML struct {
 	DashboardStateStream string `yaml:"dashboardStateStream"`
 }
 
+func (m *Manager) handleAdminClientKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"clientKey": m.cfg.ClientAPIKey})
+}
+
 func (m *Manager) handleAdminConfigYAML(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
