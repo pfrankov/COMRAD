@@ -6,7 +6,12 @@
     "openLogs": "Открыть логи",
     "launchAtLogin": "Запускать при входе",
     "idleOnly": "Работать только в простое",
-    "quit": "Выйти из COMRAD"
+    "quit": "Выйти из COMRAD",
+    "cachedModels": "Загруженные модели",
+    "cachedModelsEmpty": "Нет загруженных моделей",
+    "cachedModelsDeleteConfirmTitle": "Удалить загруженную модель?",
+    "cachedModelsDeleteConfirmMessage": "«{name}» будет удалена с диска. При необходимости воркер загрузит её снова.",
+    "cachedModelsDeleteButton": "Удалить"
   },
   "status": {
     "paused": "Приостановлено",

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"sort"
 	"time"
 )
 
@@ -150,6 +152,27 @@ func (w *Worker) serveStatus(ctx context.Context, addr string, addrCh chan<- str
 		w.setPaused(false)
 		rw.WriteHeader(http.StatusOK)
 	})
+	mux.HandleFunc("/cache", func(rw http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			rw.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(rw).Encode(w.cacheList())
+		case http.MethodDelete:
+			artifactID := r.URL.Query().Get("artifactId")
+			if artifactID == "" {
+				rw.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if err := w.evictArtifact(EvictArtifactPayload{ArtifactID: artifactID}); err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				_, _ = rw.Write([]byte(err.Error()))
+				return
+			}
+			rw.WriteHeader(http.StatusOK)
+		default:
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
 
 	srv := &http.Server{Handler: mux}
 	errCh := make(chan error, 1)
@@ -165,4 +188,49 @@ func (w *Worker) serveStatus(ctx context.Context, addr string, addrCh chan<- str
 	case err := <-errCh:
 		return err
 	}
+}
+
+// CachedArtifactInfo describes a single artifact cached on this worker.
+type CachedArtifactInfo struct {
+	ID        string   `json:"id"`
+	SizeBytes int64    `json:"sizeBytes"`
+	Profiles  []string `json:"profiles,omitempty"`
+}
+
+func (w *Worker) cacheList() []CachedArtifactInfo {
+	type entry struct {
+		id       string
+		path     string
+		profiles []string
+	}
+	w.mu.Lock()
+	entries := make([]entry, 0, len(w.cache))
+	for id, path := range w.cache {
+		e := entry{id: id, path: path}
+		for profileID, profile := range w.warm {
+			if profileUsesArtifact(profile, id) {
+				e.profiles = append(e.profiles, profileID)
+			}
+		}
+		for _, assignment := range w.assigns {
+			if assignmentUsesArtifact(assignment, id) {
+				if !Contains(e.profiles, assignment.Profile.ID) {
+					e.profiles = append(e.profiles, assignment.Profile.ID)
+				}
+			}
+		}
+		entries = append(entries, e)
+	}
+	w.mu.Unlock()
+
+	result := make([]CachedArtifactInfo, 0, len(entries))
+	for _, e := range entries {
+		info := CachedArtifactInfo{ID: e.id, Profiles: e.profiles}
+		if fi, err := os.Stat(e.path); err == nil {
+			info.SizeBytes = fi.Size()
+		}
+		result = append(result, info)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	return result
 }

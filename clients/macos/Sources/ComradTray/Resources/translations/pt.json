@@ -6,7 +6,12 @@
     "openLogs": "Abrir registros",
     "launchAtLogin": "Iniciar ao fazer login",
     "idleOnly": "Trabalhar apenas quando ocioso",
-    "quit": "Sair do COMRAD"
+    "quit": "Sair do COMRAD",
+    "cachedModels": "Modelos baixados",
+    "cachedModelsEmpty": "Nenhum modelo baixado",
+    "cachedModelsDeleteConfirmTitle": "Excluir modelo baixado?",
+    "cachedModelsDeleteConfirmMessage": "\"{name}\" será removido do disco. O worker fará o download novamente se necessário.",
+    "cachedModelsDeleteButton": "Excluir"
   },
   "status": {
     "paused": "Pausado",

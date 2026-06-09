@@ -6,7 +6,12 @@
     "openLogs": "ログを開く",
     "launchAtLogin": "ログイン時に起動",
     "idleOnly": "アイドル時のみ動作",
-    "quit": "COMRAD を終了"
+    "quit": "COMRAD を終了",
+    "cachedModels": "ダウンロード済みモデル",
+    "cachedModelsEmpty": "ダウンロード済みモデルなし",
+    "cachedModelsDeleteConfirmTitle": "ダウンロード済みモデルを削除しますか？",
+    "cachedModelsDeleteConfirmMessage": "「{name}」をディスクから削除します。必要に応じてワーカーが再ダウンロードします。",
+    "cachedModelsDeleteButton": "削除"
   },
   "status": {
     "paused": "一時停止中",

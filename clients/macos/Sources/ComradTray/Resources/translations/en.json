@@ -6,7 +6,12 @@
     "openLogs": "Open Logs",
     "launchAtLogin": "Launch at Login",
     "idleOnly": "Work Only When Idle",
-    "quit": "Quit COMRAD"
+    "quit": "Quit COMRAD",
+    "cachedModels": "Downloaded Models",
+    "cachedModelsEmpty": "No downloaded models",
+    "cachedModelsDeleteConfirmTitle": "Delete downloaded model?",
+    "cachedModelsDeleteConfirmMessage": "\"{name}\" will be removed from disk. The worker will re-download it if needed.",
+    "cachedModelsDeleteButton": "Delete"
   },
   "status": {
     "paused": "Paused",

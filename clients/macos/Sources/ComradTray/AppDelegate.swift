@@ -59,6 +59,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuController.onOpenLogs = { [weak self] in self?.openLogs() }
         menuController.onToggleLaunchAtLogin = { [weak self] in self?.toggleLaunchAtLogin() }
         menuController.onToggleIdleOnlyMode = { [weak self] in self?.toggleIdleOnlyMode() }
+        menuController.onEvictCachedArtifact = { [weak self] artifactId in
+            guard let self else { return }
+            self.workerControl.evictCachedArtifact(port: self.settings.statusPort, artifactId: artifactId) { [weak self] _ in
+                self?.fetchAndUpdateCache()
+            }
+        }
         menuController.onQuit = { NSApp.terminate(nil) }
     }
 
@@ -161,6 +167,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func pollerDidUpdate(_ state: PollerState) {
         refreshMenu()
+        if case .connected = state {
+            fetchAndUpdateCache()
+        }
+    }
+
+    private func fetchAndUpdateCache() {
+        workerControl.fetchCache(port: settings.statusPort) { [weak self] artifacts in
+            self?.menuController.updateCache(artifacts)
+        }
     }
 
     private func workerDidChangeState(_ state: WorkerProcessState) {

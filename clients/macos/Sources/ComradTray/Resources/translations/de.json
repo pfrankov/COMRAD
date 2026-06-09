@@ -6,7 +6,12 @@
     "openLogs": "Protokolle öffnen",
     "launchAtLogin": "Beim Anmelden starten",
     "idleOnly": "Nur im Leerlauf arbeiten",
-    "quit": "COMRAD beenden"
+    "quit": "COMRAD beenden",
+    "cachedModels": "Heruntergeladene Modelle",
+    "cachedModelsEmpty": "Keine heruntergeladenen Modelle",
+    "cachedModelsDeleteConfirmTitle": "Heruntergeladenes Modell löschen?",
+    "cachedModelsDeleteConfirmMessage": "\"{name}\" wird vom Datenträger entfernt. Der Worker lädt es bei Bedarf erneut herunter.",
+    "cachedModelsDeleteButton": "Löschen"
   },
   "status": {
     "paused": "Angehalten",

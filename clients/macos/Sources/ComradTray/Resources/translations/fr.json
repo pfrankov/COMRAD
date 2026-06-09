@@ -6,7 +6,12 @@
     "openLogs": "Ouvrir les journaux",
     "launchAtLogin": "Lancer à l'ouverture de session",
     "idleOnly": "Travailler uniquement en inactivité",
-    "quit": "Quitter COMRAD"
+    "quit": "Quitter COMRAD",
+    "cachedModels": "Modèles téléchargés",
+    "cachedModelsEmpty": "Aucun modèle téléchargé",
+    "cachedModelsDeleteConfirmTitle": "Supprimer le modèle téléchargé ?",
+    "cachedModelsDeleteConfirmMessage": "\"{name}\" sera supprimé du disque. Le worker le retéléchargera si nécessaire.",
+    "cachedModelsDeleteButton": "Supprimer"
   },
   "status": {
     "paused": "En pause",

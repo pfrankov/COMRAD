@@ -6,7 +6,12 @@
     "openLogs": "打开日志",
     "launchAtLogin": "登录时启动",
     "idleOnly": "仅在空闲时工作",
-    "quit": "退出 COMRAD"
+    "quit": "退出 COMRAD",
+    "cachedModels": "已下载的模型",
+    "cachedModelsEmpty": "没有已下载的模型",
+    "cachedModelsDeleteConfirmTitle": "删除已下载的模型？",
+    "cachedModelsDeleteConfirmMessage": "「{name}」将从磁盘中移除。如有需要，Worker 将重新下载。",
+    "cachedModelsDeleteButton": "删除"
   },
   "status": {
     "paused": "已暂停",

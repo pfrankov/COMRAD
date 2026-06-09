@@ -7,9 +7,12 @@ final class MenuController: NSObject, NSMenuDelegate {
     private var statusHeaderItem: NSMenuItem!
     private var statusDetailItem: NSMenuItem!
     private var startStopItem: NSMenuItem!
+    private var cachedModelsItem: NSMenuItem!
+    private var cachedModelsSubmenu: NSMenu!
     private var launchAtLoginItem: NSMenuItem!
     private var idleOnlyItem: NSMenuItem!
     private var workerRunning = false
+    private var cachedArtifacts: [CachedArtifactInfo] = []
 
     private var pulseTimer: Timer?
     private var pulsePhase: CGFloat = 0
@@ -24,6 +27,7 @@ final class MenuController: NSObject, NSMenuDelegate {
     var onOpenLogs: (() -> Void)?
     var onToggleLaunchAtLogin: (() -> Void)?
     var onToggleIdleOnlyMode: (() -> Void)?
+    var onEvictCachedArtifact: ((String) -> Void)?
     var onQuit: (() -> Void)?
 
     init(statusItem: NSStatusItem) {
@@ -71,6 +75,15 @@ final class MenuController: NSObject, NSMenuDelegate {
 
         startStopItem = makeItem(loc.t("menu.startWorker"), systemImage: "play.fill", action: #selector(startStop))
         menu.addItem(startStopItem)
+
+        menu.addItem(.separator())
+
+        cachedModelsSubmenu = NSMenu()
+        cachedModelsItem = NSMenuItem(title: loc.t("menu.cachedModels", fallback: "Downloaded Models"),
+                                      action: nil, keyEquivalent: "")
+        cachedModelsItem.image = NSImage(systemSymbolName: "internaldrive", accessibilityDescription: nil)
+        cachedModelsItem.submenu = cachedModelsSubmenu
+        menu.addItem(cachedModelsItem)
 
         menu.addItem(.separator())
         menu.addItem(makeItem(loc.t("menu.settings"),
@@ -241,6 +254,51 @@ final class MenuController: NSObject, NSMenuDelegate {
         NSImage(size: size, flipped: false) { _ in true }
     }
 
+    func updateCache(_ artifacts: [CachedArtifactInfo]) {
+        cachedArtifacts = artifacts
+        rebuildCacheSubmenu()
+    }
+
+    private func rebuildCacheSubmenu() {
+        let loc = Localization.shared
+        cachedModelsSubmenu.removeAllItems()
+        if cachedArtifacts.isEmpty {
+            let empty = NSMenuItem(title: loc.t("menu.cachedModelsEmpty", fallback: "No downloaded models"),
+                                   action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            cachedModelsSubmenu.addItem(empty)
+            return
+        }
+        for artifact in cachedArtifacts {
+            let label = "\(artifactDisplayName(artifact)) — \(formatBytes(artifact.sizeBytes))"
+            let item = NSMenuItem(title: label, action: #selector(deleteCachedArtifact(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = artifact.id
+            cachedModelsSubmenu.addItem(item)
+        }
+    }
+
+    private func artifactDisplayName(_ artifact: CachedArtifactInfo) -> String {
+        if let profile = artifact.profiles?.first {
+            var name = profile
+            if name.hasPrefix("llm.chat/") { name = String(name.dropFirst("llm.chat/".count)) }
+            if let range = name.range(of: "/context-", options: .backwards) {
+                name = String(name[..<range.lowerBound])
+            }
+            return name.isEmpty ? profile : name
+        }
+        let hash = artifact.id.hasPrefix("sha256:") ? String(artifact.id.dropFirst(7)) : artifact.id
+        return hash.count > 12 ? String(hash.prefix(12)) + "…" : hash
+    }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        let gb = Double(bytes) / 1_073_741_824
+        if gb >= 1 { return String(format: "%.1f GB", gb) }
+        let mb = Double(bytes) / 1_048_576
+        if mb >= 1 { return String(format: "%.0f MB", mb) }
+        return "\(bytes / 1024) KB"
+    }
+
     // MARK: - Actions
 
     @objc private func startStop() {
@@ -252,4 +310,24 @@ final class MenuController: NSObject, NSMenuDelegate {
     @objc private func toggleLaunchAtLogin() { onToggleLaunchAtLogin?() }
     @objc private func toggleIdleOnlyMode() { onToggleIdleOnlyMode?() }
     @objc private func quit() { onQuit?() }
+
+    @objc private func deleteCachedArtifact(_ sender: NSMenuItem) {
+        guard let artifactId = sender.representedObject as? String else { return }
+        let loc = Localization.shared
+        let artifact = cachedArtifacts.first { $0.id == artifactId }
+        let name = artifact.map { artifactDisplayName($0) } ?? artifactId
+
+        let alert = NSAlert()
+        alert.messageText = loc.t("menu.cachedModelsDeleteConfirmTitle", fallback: "Delete downloaded model?")
+        alert.informativeText = loc.t("menu.cachedModelsDeleteConfirmMessage",
+                                       values: ["name": name],
+                                       fallback: "\"\(name)\" will be removed from disk. The worker will re-download it if needed.")
+        alert.addButton(withTitle: loc.t("menu.cachedModelsDeleteButton", fallback: "Delete"))
+        alert.addButton(withTitle: loc.t("settings.cancel", fallback: "Cancel"))
+        alert.alertStyle = .warning
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            onEvictCachedArtifact?(artifactId)
+        }
+    }
 }
