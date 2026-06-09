@@ -28,11 +28,27 @@ final class WorkerProcess {
     private let logFileURL: URL
     private let errLogFileURL: URL
     private let workerBinaryURL: URL
+    private let pidFileURL: URL
 
     init(workerBinaryURL: URL, dataDir: URL) {
         self.workerBinaryURL = workerBinaryURL
         self.logFileURL = dataDir.appendingPathComponent("worker.log")
         self.errLogFileURL = dataDir.appendingPathComponent("worker.err.log")
+        self.pidFileURL = dataDir.appendingPathComponent("worker.pid")
+        killLeftoverWorker()
+    }
+
+    // Kills any worker process left over from a previous session (crash / force-quit).
+    private func killLeftoverWorker() {
+        guard let data = try? Data(contentsOf: pidFileURL),
+              let pidString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let pid = Int32(pidString), pid > 0 else {
+            return
+        }
+        if kill(pid, 0) == 0 {
+            kill(pid, SIGTERM)
+        }
+        try? FileManager.default.removeItem(at: pidFileURL)
     }
 
     // Must be called on the main thread.
@@ -54,6 +70,7 @@ final class WorkerProcess {
             proc.terminationHandler = nil  // Prevent the async handler from treating this as a crash
             proc.terminate()
         }
+        try? FileManager.default.removeItem(at: pidFileURL)
         updateState(.stopped)
     }
 
@@ -83,7 +100,9 @@ final class WorkerProcess {
         do {
             try proc.run()
             process = proc
-            updateState(.running(pid: proc.processIdentifier))
+            let pid = proc.processIdentifier
+            try? "\(pid)".write(to: pidFileURL, atomically: true, encoding: .utf8)
+            updateState(.running(pid: pid))
         } catch {
             updateState(.failed(reason: error.localizedDescription))
         }
