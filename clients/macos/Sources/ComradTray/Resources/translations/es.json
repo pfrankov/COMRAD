@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "startWorker": "Iniciar Worker",
+    "stopWorker": "Detener Worker",
+    "settings": "Ajustes…",
+    "openLogs": "Abrir registros",
+    "launchAtLogin": "Iniciar al iniciar sesión",
+    "idleOnly": "Trabajar solo en inactividad",
+    "quit": "Salir de COMRAD"
+  },
+  "status": {
+    "paused": "En pausa",
+    "macInUse": "Mac en uso — se reanuda al estar inactiva",
+    "notResponding": "Sin respuesta",
+    "restarting": "Reiniciando — intento {attempt}",
+    "stopped": "Detenido",
+    "startingUp": "Iniciando…",
+    "disconnected": "Desconectado del administrador",
+    "unreachable": "El administrador no es accesible",
+    "notRunning": "El administrador no está ejecutándose",
+    "hostNotFound": "Host del administrador no encontrado",
+    "finishingRequests_one": "Finalizando {count} solicitud activa",
+    "finishingRequests_other": "Finalizando {count} solicitudes activas",
+    "working": "Trabajando — {serving} de {total}",
+    "loadingModel": "Cargando modelo…",
+    "ready": "Listo",
+    "modelsWarm_one": "{count} modelo preparado",
+    "modelsWarm_other": "{count} modelos preparados"
+  },
+  "settings": {
+    "title": "Ajustes de COMRAD",
+    "connection": "Conexión",
+    "language": "Idioma",
+    "managerUrl": "URL del Manager",
+    "managerUrlHelp": "URL del Manager de COMRAD al que el worker se conecta para tareas.\nEjemplo: http://192.168.1.100:1922",
+    "token": "Token",
+    "tokenHelp": "Token secreto para la autorización del worker con el Manager.\nSe encuentra en la configuración del Manager.",
+    "worker": "Worker",
+    "memory": "Memoria",
+    "memoryHelp": "Memoria unificada asignada al clúster para cargar modelos.\nTamaños típicos: 7B ≈ 4 GB, 13B ≈ 8 GB, 70B ≈ 32 GB.",
+    "disk": "Disco",
+    "diskHelp": "Espacio máximo en disco para la caché de modelos.\nEl worker no descargará modelos que excedan este límite.",
+    "p2p": "P2P",
+    "enableP2P": "Activar P2P",
+    "enableP2PHelp": "La distribución P2P permite que los nodos compartan archivos de modelo\ndirectamente en lugar de descargarlos nuevamente desde servidores externos.",
+    "port": "Puerto",
+    "portHelp": "Puerto TCP/UDP para el intercambio de archivos de modelo BitTorrent entre nodos.\nÁbralo en las reglas del firewall de entrada para una mejor conectividad.",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "gb": "GB",
+    "system": "Sistema"
+  },
+  "alert": {
+    "binaryNotFound": "comrad-worker no encontrado",
+    "binaryNotFoundDetail": "No se pudo localizar el binario del worker dentro de COMRAD.app.\nPor favor, reinstale.",
+    "removePlistTitle": "¿Eliminar archivo de trabajo launchd?",
+    "removePlistDetail": "COMRAD ahora es gestionado por la aplicación de la barra de menú.\nEl antiguo plist launchd en:\n{path}\npuede eliminarse.",
+    "remove": "Eliminar",
+    "keep": "Conservar"
+  }
+}

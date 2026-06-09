@@ -10,24 +10,26 @@ private struct SettingsView: View {
     @State private var diskGB: Int
     @State private var p2pEnabled: Bool
     @State private var p2pPortText: String
+    @State private var selectedLanguage: String
 
     private let maxMemoryGB: Int
     private let maxDiskGB: Int
     private let store: SettingsStore
     private let initial: Settings
-    private let onSave: (Settings, String) -> Void
+    private let onSave: (Settings) -> Void
     private let onDismiss: () -> Void
 
     init(store: SettingsStore,
-         onSave: @escaping (Settings, String) -> Void,
+         onSave: @escaping (Settings) -> Void,
          onDismiss: @escaping () -> Void) {
         let s = store.load()
         _managerURL = State(initialValue: s.managerURL)
-        _token      = State(initialValue: store.loadToken())
+        _token      = State(initialValue: s.token)
         _memoryGB    = State(initialValue: s.memoryGB)
         _diskGB      = State(initialValue: s.diskGB)
         _p2pEnabled  = State(initialValue: !s.disableP2P)
         _p2pPortText = State(initialValue: "\(s.p2pPort)")
+        _selectedLanguage = State(initialValue: s.language.isEmpty ? Localization.systemLanguage() : s.language)
         self.maxMemoryGB = Settings.physicalMemoryGB()
         self.maxDiskGB   = Settings.availableDiskGB()
         self.store   = store
@@ -37,32 +39,36 @@ private struct SettingsView: View {
     }
 
     var body: some View {
+        let loc = Localization.shared
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
-                section("Connection", icon: "network") {
-                    row("Manager URL",
-                        help: "URL COMRAD Manager, к которому подключается воркер для получения задач. Пример: http://192.168.1.100:1922") {
+                section(loc.t("settings.language"), icon: "globe") {
+                    languagePicker(loc: loc)
+                }
+                section(loc.t("settings.connection"), icon: "network") {
+                    row(loc.t("settings.managerUrl"),
+                        help: loc.t("settings.managerUrlHelp")) {
                         TextField("http://127.0.0.1:1922", text: $managerURL)
                             .font(.system(.body, design: .monospaced))
                     }
-                    row("Token",
-                        help: "Секретный токен для авторизации воркера у менеджера. Находится в настройках менеджера.") {
-                        SecureField("worker token", text: $token)
+                    row(loc.t("settings.token"),
+                        help: loc.t("settings.tokenHelp")) {
+                        SecureField(loc.t("settings.token"), text: $token)
                     }
                 }
-                section("Worker", icon: "cpu") {
-                    resourceRow("Memory", value: $memoryGB, max: maxMemoryGB,
-                                help: "Unified-память, предоставляемая кластеру для загрузки моделей. Типичный размер модели: 7B ≈ 4 GB, 13B ≈ 8 GB, 70B ≈ 32 GB.")
-                    resourceRow("Disk", value: $diskGB, max: maxDiskGB,
-                                help: "Максимальный объём диска для кэша моделей. Воркер не будет скачивать модели сверх этого лимита.")
+                section(loc.t("settings.worker"), icon: "cpu") {
+                    resourceRow(loc.t("settings.memory"), value: $memoryGB, max: maxMemoryGB,
+                                help: loc.t("settings.memoryHelp"))
+                    resourceRow(loc.t("settings.disk"), value: $diskGB, max: maxDiskGB,
+                                help: loc.t("settings.diskHelp"))
                 }
-                section("P2P", icon: "wifi") {
-                    row("Enable P2P",
-                        help: "P2P-раздача позволяет нодам обмениваться файлами моделей напрямую, не скачивая их заново с внешних серверов.") {
+                section(loc.t("settings.p2p"), icon: "wifi") {
+                    row(loc.t("settings.enableP2P"),
+                        help: loc.t("settings.enableP2PHelp")) {
                         Toggle("", isOn: $p2pEnabled).labelsHidden()
                     }
-                    row("Port",
-                        help: "TCP/UDP порт для BitTorrent-обмена файлами моделей между нодами. Откройте его во входящих правилах файрволла для лучшей связности.") {
+                    row(loc.t("settings.port"),
+                        help: loc.t("settings.portHelp")) {
                         TextField("6881", text: $p2pPortText)
                             .frame(width: 70)
                             .multilineTextAlignment(.trailing)
@@ -76,17 +82,34 @@ private struct SettingsView: View {
             Divider()
 
             HStack {
-                Button("Cancel", action: onDismiss)
+                Button(loc.t("settings.cancel"), action: onDismiss)
                     .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Save", action: commitSave)
+                Button(loc.t("settings.save"), action: commitSave)
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
-        .frame(width: 420)
+        .frame(width: 440)
+    }
+
+    @ViewBuilder
+    private func languagePicker(loc: Localization) -> some View {
+        HStack(spacing: 10) {
+            Text(loc.t("settings.language"))
+                .frame(width: 90, alignment: .trailing)
+                .foregroundStyle(.secondary)
+            Picker("", selection: $selectedLanguage) {
+                ForEach(Localization.locales, id: \.self) { code in
+                    Text(Localization.localeNames[code] ?? code).tag(code)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 180)
+            Spacer()
+        }
     }
 
     @ViewBuilder
@@ -111,7 +134,7 @@ private struct SettingsView: View {
                     if v > maxVal { value.wrappedValue = maxVal }
                     if v < 1     { value.wrappedValue = 1 }
                 }
-            Text("GB").foregroundStyle(.secondary)
+            Text(Localization.shared.t("settings.gb")).foregroundStyle(.secondary)
         }
     }
 
@@ -145,9 +168,10 @@ private struct SettingsView: View {
         s.diskGB     = diskGB.clamped(to: 1...maxDiskGB)
         s.disableP2P = !p2pEnabled
         s.p2pPort    = Int(p2pPortText) ?? initial.p2pPort
+        s.token = token
+        s.language = selectedLanguage
         try? store.save(s)
-        try? store.saveToken(token)
-        onSave(s, token)
+        onSave(s)
         onDismiss()
     }
 }
@@ -155,14 +179,14 @@ private struct SettingsView: View {
 // MARK: - Window controller
 
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    init(store: SettingsStore, onSave: @escaping (Settings, String) -> Void) {
+    init(store: SettingsStore, onSave: @escaping (Settings) -> Void) {
         let win = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 300),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
-        win.title = "COMRAD Settings"
+        win.title = Localization.shared.t("settings.title")
         super.init(window: win)
         win.delegate = self
 

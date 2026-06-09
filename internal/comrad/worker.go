@@ -53,8 +53,9 @@ type Worker struct {
 	cache             map[string]string
 	cacheState        map[string]cachedArtifactState
 	warm              map[string]WorkloadProfile
-	activeAssignments map[string]bool
-	processed         map[string]time.Time
+	activeAssignments  map[string]bool
+	assignmentFailures map[string]time.Time // assignment key -> time of last failure
+	processed          map[string]time.Time
 	active            map[string]context.CancelFunc
 	runtimes          map[string]*llamaServerProcess
 	runtimeRestarts   map[string]int
@@ -105,8 +106,9 @@ func NewWorker(cfg WorkerConfig) (*Worker, error) {
 		cache:             state.Cache,
 		cacheState:        state.CachedArtifacts,
 		warm:              map[string]WorkloadProfile{},
-		activeAssignments: map[string]bool{},
-		processed:         map[string]time.Time{},
+		activeAssignments:  map[string]bool{},
+		assignmentFailures: map[string]time.Time{},
+		processed:          map[string]time.Time{},
 		active:            map[string]context.CancelFunc{},
 		runtimes:          map[string]*llamaServerProcess{},
 		runtimeRestarts:   map[string]int{},

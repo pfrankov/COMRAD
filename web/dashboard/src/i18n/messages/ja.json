@@ -641,6 +641,7 @@
   "value.healthy": "healthy",
   "value.offline": "offline",
   "value.online": "online",
+  "value.paused": "一時停止",
   "value.quarantined": "quarantined",
   "value.queued": "queued",
   "value.ready": "ready",

@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "startWorker": "Worker starten",
+    "stopWorker": "Worker stoppen",
+    "settings": "Einstellungen…",
+    "openLogs": "Protokolle öffnen",
+    "launchAtLogin": "Beim Anmelden starten",
+    "idleOnly": "Nur im Leerlauf arbeiten",
+    "quit": "COMRAD beenden"
+  },
+  "status": {
+    "paused": "Angehalten",
+    "macInUse": "Mac wird genutzt — wird im Leerlauf fortgesetzt",
+    "notResponding": "Keine Antwort",
+    "restarting": "Neustart — Versuch {attempt}",
+    "stopped": "Gestoppt",
+    "startingUp": "Starte…",
+    "disconnected": "Vom Manager getrennt",
+    "unreachable": "Manager ist nicht erreichbar",
+    "notRunning": "Manager läuft nicht",
+    "hostNotFound": "Manager-Host nicht gefunden",
+    "finishingRequests_one": "Beende {count} aktive Anfrage",
+    "finishingRequests_other": "Beende {count} aktive Anfragen",
+    "working": "Arbeite — {serving} von {total}",
+    "loadingModel": "Lade Modell…",
+    "ready": "Bereit",
+    "modelsWarm_one": "{count} Modell warm",
+    "modelsWarm_other": "{count} Modelle warm"
+  },
+  "settings": {
+    "title": "COMRAD Einstellungen",
+    "connection": "Verbindung",
+    "language": "Sprache",
+    "managerUrl": "Manager-URL",
+    "managerUrlHelp": "URL des COMRAD-Managers, mit dem der Worker für Aufgaben verbindet.\nBeispiel: http://192.168.1.100:1922",
+    "token": "Token",
+    "tokenHelp": "Geheimer Token für die Worker-Autorisierung beim Manager.\nBefindet sich in den Manager-Einstellungen.",
+    "worker": "Worker",
+    "memory": "Arbeitsspeicher",
+    "memoryHelp": "Vereinheitlichter Speicher, der dem Cluster zum Laden von Modellen zugewiesen wird.\nTypische Modellgrößen: 7B ≈ 4 GB, 13B ≈ 8 GB, 70B ≈ 32 GB.",
+    "disk": "Festplatte",
+    "diskHelp": "Maximaler Festplattenspeicher für den Modell-Cache.\nDer Worker lädt keine Modelle herunter, die dieses Limit überschreiten.",
+    "p2p": "P2P",
+    "enableP2P": "P2P aktivieren",
+    "enableP2PHelp": "P2P-Verteilung ermöglicht es Knoten, Modelldateien direkt auszutauschen,\nstatt sie erneut von externen Servern herunterzuladen.",
+    "port": "Port",
+    "portHelp": "TCP/UDP-Port für den BitTorrent-Modelldateiaustausch zwischen Knoten.\nÖffnen Sie ihn in den eingehenden Firewall-Regeln für bessere Konnektivität.",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "gb": "GB",
+    "system": "System"
+  },
+  "alert": {
+    "binaryNotFound": "comrad-worker nicht gefunden",
+    "binaryNotFoundDetail": "Die Worker-Binärdatei konnte in COMRAD.app nicht gefunden werden.\nBitte neu installieren.",
+    "removePlistTitle": "Launchd-Jobdatei entfernen?",
+    "removePlistDetail": "COMRAD wird jetzt von der Menüleisten-App verwaltet.\nDie alte launchd-plist unter:\n{path}\nkann entfernt werden.",
+    "remove": "Entfernen",
+    "keep": "Behalten"
+  }
+}

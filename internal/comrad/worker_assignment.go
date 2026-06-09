@@ -6,7 +6,14 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
+
+// assignmentFailureCooldown is how long the worker backs off before retrying an
+// assignment that failed with a permanent error (e.g. 404 artifact not found on
+// the manager). This prevents an infinite tight loop when the manager keeps
+// re-dispatching assignments for an artifact whose file is missing from storage.
+const assignmentFailureCooldown = 5 * time.Minute
 
 func (w *Worker) handleAssignment(ctx context.Context, payload AssignmentPayload) error {
 	if err := validateAssignmentPayload(payload); err != nil {
@@ -33,6 +40,7 @@ func (w *Worker) queueAssignment(ctx context.Context, payload AssignmentPayload)
 		defer w.finishAssignment(payload)
 		if err := w.runAssignment(ctx, payload); err != nil {
 			log.Printf("assignment %s failed: %v", payload.Profile.ID, err)
+			w.recordAssignmentFailure(assignmentKey(payload.Profile))
 		}
 	}()
 	return nil
@@ -43,6 +51,19 @@ func validateAssignmentPayload(payload AssignmentPayload) error {
 		return errors.New("assignment missing profile")
 	}
 	return nil
+}
+
+func (w *Worker) recordAssignmentFailure(key string) {
+	w.mu.Lock()
+	w.assignmentFailures[key] = time.Now()
+	w.mu.Unlock()
+}
+
+func (w *Worker) assignmentInCooldown(key string) bool {
+	w.mu.Lock()
+	t, ok := w.assignmentFailures[key]
+	w.mu.Unlock()
+	return ok && time.Since(t) < assignmentFailureCooldown
 }
 
 func (w *Worker) beginAssignment(payload AssignmentPayload) bool {
@@ -135,9 +156,14 @@ func (w *Worker) ensureSlotWarm(ctx context.Context, slotID string, payload Assi
 }
 
 func (w *Worker) assignmentAlreadySatisfied(payload AssignmentPayload) bool {
+	key := assignmentKey(payload.Profile)
+	// Back off after a recent failure to avoid hammering a permanently broken
+	// artifact URL (e.g. file missing from manager storage).
+	if w.assignmentInCooldown(key) {
+		return true
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	key := assignmentKey(payload.Profile)
 	if w.activeAssignments[key] {
 		return true
 	}

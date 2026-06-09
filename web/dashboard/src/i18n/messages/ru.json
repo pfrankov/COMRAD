@@ -641,6 +641,7 @@
   "value.healthy": "исправен",
   "value.offline": "офлайн",
   "value.online": "онлайн",
+  "value.paused": "на паузе",
   "value.quarantined": "карантин",
   "value.queued": "в очереди",
   "value.ready": "готово",

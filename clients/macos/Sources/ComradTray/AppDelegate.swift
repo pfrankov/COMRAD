@@ -8,14 +8,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindowController: SettingsWindowController?
     private let store = SettingsStore()
     private var settings: Settings = Settings()
-    private var token: String = ""
 
     private let idleDetector = IdleDetector()
     private let workerControl = WorkerControl()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         settings = store.load()
-        token = store.loadToken()
+
+        if settings.language.isEmpty {
+            settings.language = Localization.systemLanguage()
+            try? store.save(settings)
+        }
+        Localization.shared = Localization(language: settings.language)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -68,13 +72,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startWorkerIfNeeded() {
         guard workerProcess == nil else {
-            workerProcess?.restart(env: settings.envVars(token: token))
+            workerProcess?.restart(env: settings.envVars())
             return
         }
         guard let binaryURL = WorkerProcess.resolveWorkerBinary() else {
+            let loc = Localization.shared
             let alert = NSAlert()
-            alert.messageText = "comrad-worker not found"
-            alert.informativeText = "Could not locate the worker binary inside COMRAD.app.\nPlease reinstall."
+            alert.messageText = loc.t("alert.binaryNotFound")
+            alert.informativeText = loc.t("alert.binaryNotFoundDetail")
             alert.runModal()
             return
         }
@@ -85,21 +90,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { self?.workerDidChangeState(state) }
         }
         workerProcess = proc
-        proc.start(env: settings.envVars(token: token))
+        proc.start(env: settings.envVars())
     }
 
     private func openSettings() {
-        if settingsWindowController == nil {
-            settingsWindowController = SettingsWindowController(store: store) { [weak self] newSettings, newToken in
-                guard let self else { return }
-                let changed = newSettings != self.settings || newToken != self.token
-                self.settings = newSettings
-                self.token = newToken
-                self.statusPoller.updatePort(newSettings.statusPort)
-                if changed {
-                    self.workerProcess?.restart(env: self.settings.envVars(token: self.token))
+        settingsWindowController = SettingsWindowController(store: store) { [weak self] newSettings in
+            guard let self else { return }
+            let oldLanguage = self.settings.language
+            let changed = newSettings != self.settings
+            self.settings = newSettings
+            self.statusPoller.updatePort(newSettings.statusPort)
+            if changed {
+                if newSettings.language != oldLanguage {
+                    Localization.shared = Localization(language: newSettings.language)
                 }
-                self.settingsWindowController = nil
+                self.workerProcess?.restart(env: self.settings.envVars())
             }
         }
         settingsWindowController?.showWindow(nil)

@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "startWorker": "Start Worker",
+    "stopWorker": "Stop Worker",
+    "settings": "Settings…",
+    "openLogs": "Open Logs",
+    "launchAtLogin": "Launch at Login",
+    "idleOnly": "Work Only When Idle",
+    "quit": "Quit COMRAD"
+  },
+  "status": {
+    "paused": "Paused",
+    "macInUse": "Mac in use — resumes when idle",
+    "notResponding": "Not responding",
+    "restarting": "Restarting — attempt {attempt}",
+    "stopped": "Stopped",
+    "startingUp": "Starting up…",
+    "disconnected": "Disconnected from manager",
+    "unreachable": "Manager is unreachable",
+    "notRunning": "Manager is not running",
+    "hostNotFound": "Manager host not found",
+    "finishingRequests_one": "Finishing {count} active request",
+    "finishingRequests_other": "Finishing {count} active requests",
+    "working": "Working — {serving} of {total}",
+    "loadingModel": "Loading model…",
+    "ready": "Ready",
+    "modelsWarm_one": "{count} model warm",
+    "modelsWarm_other": "{count} models warm"
+  },
+  "settings": {
+    "title": "COMRAD Settings",
+    "connection": "Connection",
+    "language": "Language",
+    "managerUrl": "Manager URL",
+    "managerUrlHelp": "URL of the COMRAD Manager the worker connects to for tasks.\nExample: http://192.168.1.100:1922",
+    "token": "Token",
+    "tokenHelp": "Secret token for worker authorization with the Manager.\nFound in Manager settings.",
+    "worker": "Worker",
+    "memory": "Memory",
+    "memoryHelp": "Unified memory allocated to the cluster for loading models.\nTypical model sizes: 7B ≈ 4 GB, 13B ≈ 8 GB, 70B ≈ 32 GB.",
+    "disk": "Disk",
+    "diskHelp": "Maximum disk space for model cache.\nWorker will not download models exceeding this limit.",
+    "p2p": "P2P",
+    "enableP2P": "Enable P2P",
+    "enableP2PHelp": "P2P distribution lets nodes share model files directly\ninstead of downloading them again from external servers.",
+    "port": "Port",
+    "portHelp": "TCP/UDP port for BitTorrent model file exchange between nodes.\nOpen it in inbound firewall rules for better connectivity.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "gb": "GB",
+    "system": "System"
+  },
+  "alert": {
+    "binaryNotFound": "comrad-worker not found",
+    "binaryNotFoundDetail": "Could not locate the worker binary inside COMRAD.app.\nPlease reinstall.",
+    "removePlistTitle": "Remove launchd job file?",
+    "removePlistDetail": "COMRAD is now managed by the menu-bar app.\nThe old launchd plist at:\n{path}\ncan be removed.",
+    "remove": "Remove",
+    "keep": "Keep"
+  }
+}

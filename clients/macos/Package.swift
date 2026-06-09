@@ -10,7 +10,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "ComradTray",
-            path: "Sources/ComradTray"
+            path: "Sources/ComradTray",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "ComradTrayTests",

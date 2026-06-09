@@ -9,9 +9,9 @@ final class WorkerProcessTests: XCTestCase {
         s.statusPort = 1923
         s.p2pPort = 6881
         s.disableP2P = false
-        let token = "tok"
+        s.token = "tok"
 
-        let env = s.envVars(token: token)
+        let env = s.envVars()
 
         let required = [
             "COMRAD_MANAGER_URL",

@@ -30,6 +30,8 @@
   --color-status-offline-bg: var(--status-offline-bg);
   --color-status-updating: var(--status-updating);
   --color-status-updating-bg: var(--status-updating-bg);
+  --color-status-paused: var(--status-paused);
+  --color-status-paused-bg: var(--status-paused-bg);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -115,6 +117,8 @@
   --status-offline-bg: #f5f5f5;
   --status-updating: #4c2889;
   --status-updating-bg: #d8ccf1;
+  --status-paused: #f5a623;
+  --status-paused-bg: #ffefcf;
 }
 
 .dark {
@@ -156,6 +160,8 @@
   --status-offline-bg: #262626;
   --status-updating: #d8ccf1;
   --status-updating-bg: #211536;
+  --status-paused: #ffefcf;
+  --status-paused-bg: #3a260c;
 }
 
 @layer base {

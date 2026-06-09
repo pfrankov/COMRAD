@@ -51,9 +51,20 @@ final class StatusPoller {
     private let session: URLSession
     private var port: Int
 
-    init(port: Int, session: URLSession = .shared) {
+    /// - Parameter session: Override for testing. Production uses a dedicated
+    ///   ephemeral session so stale TCP connections never block recovery.
+    init(port: Int, session: URLSession? = nil) {
         self.port = port
-        self.session = session
+        if let session {
+            self.session = session
+        } else {
+            let config = URLSessionConfiguration.ephemeral
+            config.timeoutIntervalForRequest = 2
+            config.timeoutIntervalForResource = 4
+            config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            config.httpShouldUsePipelining = false
+            self.session = URLSession(configuration: config)
+        }
     }
 
     // Must be called on the main thread.
@@ -77,12 +88,19 @@ final class StatusPoller {
 
     private func poll() {
         let currentPort = port
-        guard let url = URL(string: "http://127.0.0.1:\(currentPort)/status") else { return }
-        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 2)
-        req.timeoutInterval = 2
+        guard let url = URL(string: "http://127.0.0.1:\(currentPort)/status") else {
+            updateState(.error("invalid status URL"))
+            return
+        }
+        let req = URLRequest(url: url,
+                             cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
+                             timeoutInterval: 2)
         let task = session.dataTask(with: req) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self else { return }
+                // Flush the connection pool so the next attempt opens a fresh
+                // TCP connection rather than reusing a potentially stale one.
+                self.session.flush { }
                 if let error {
                     self.updateState(.error(error.localizedDescription))
                     return

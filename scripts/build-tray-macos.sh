@@ -34,8 +34,19 @@ mkdir -p "$APP_MACOS" "$APP_BIN"
 # Copy Swift binary
 cp "$PKG/.build/release/ComradTray" "$APP_MACOS/"
 
+# Copy translation files
+TRANSLATIONS_SRC="$PKG/Sources/ComradTray/Resources/translations"
+TRANSLATIONS_DST="$APP_RES/translations"
+if [ -d "$TRANSLATIONS_SRC" ]; then
+  mkdir -p "$TRANSLATIONS_DST"
+  cp "$TRANSLATIONS_SRC"/*.json "$TRANSLATIONS_DST/"
+fi
+
 # Fill in Info.plist version placeholder
 sed "s/__VERSION__/$VERSION/g" "$PKG/Resources/Info.plist.in" > "$APP/Contents/Info.plist"
+
+# App icon
+cp "$PKG/Resources/COMRAD.icns" "$APP_RES/"
 
 # Copy worker binary and runtime
 cp "$BUNDLE_BIN/comrad-worker" "$APP_BIN/"

@@ -1,9 +1,6 @@
 import Foundation
-import Security
 
 private let settingsFileName = "comrad-tray-settings.json"
-private let keychainService = "com.comrad.tray"
-private let keychainTokenAccount = "worker-token"
 
 struct Settings: Codable, Equatable {
     var managerURL: String = "http://127.0.0.1:1922"
@@ -18,15 +15,10 @@ struct Settings: Codable, Equatable {
     var memoryGB: Int = Settings.physicalMemoryGB()
     var diskGB: Int = Settings.availableDiskGB()
     var idleOnlyMode: Bool = false
+    var token: String = ""
+    var language: String = ""
 
-    // token is stored in Keychain, not serialized to JSON
-    enum CodingKeys: String, CodingKey {
-        case managerURL, statusPort, p2pPort, p2pMaxUploads,
-             p2pDownloadTimeoutSeconds, disableP2P, nodeID, nodeName, launchAtLogin,
-             memoryGB, diskGB, idleOnlyMode
-    }
-
-    func envVars(token: String) -> [String: String] {
+    func envVars() -> [String: String] {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dataDir = appSupport.appendingPathComponent("COMRAD/data")
@@ -59,10 +51,8 @@ struct Settings: Codable, Equatable {
 
 final class SettingsStore {
     let fileURL: URL
-    private let keychainAccount: String
 
-    init(fileURL: URL? = nil, keychainAccount: String = keychainTokenAccount) {
-        self.keychainAccount = keychainAccount
+    init(fileURL: URL? = nil) {
         if let url = fileURL {
             self.fileURL = url
         } else {
@@ -84,45 +74,6 @@ final class SettingsStore {
     func save(_ settings: Settings) throws {
         let data = try JSONEncoder().encode(settings)
         try data.write(to: fileURL, options: .atomic)
-    }
-
-    // MARK: Keychain
-
-    func saveToken(_ token: String) throws {
-        let data = token.data(using: .utf8)!
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount,
-            kSecValueData as String: data,
-        ]
-        SecItemDelete(query as CFDictionary)
-        let status = SecItemAdd(query as CFDictionary, nil)
-        if status != errSecSuccess {
-            throw KeychainError.saveFailed(status)
-        }
-    }
-
-    func loadToken() -> String {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let token = String(data: data, encoding: .utf8) else {
-            return ""
-        }
-        return token
-    }
-
-    enum KeychainError: Error {
-        case saveFailed(OSStatus)
     }
 }
 

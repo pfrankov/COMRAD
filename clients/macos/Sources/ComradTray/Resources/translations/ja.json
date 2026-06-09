@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "startWorker": "ワーカーを起動",
+    "stopWorker": "ワーカーを停止",
+    "settings": "設定…",
+    "openLogs": "ログを開く",
+    "launchAtLogin": "ログイン時に起動",
+    "idleOnly": "アイドル時のみ動作",
+    "quit": "COMRAD を終了"
+  },
+  "status": {
+    "paused": "一時停止中",
+    "macInUse": "Mac 使用中 — アイドル時に再開",
+    "notResponding": "応答なし",
+    "restarting": "再起動中 — 試行 {attempt}",
+    "stopped": "停止中",
+    "startingUp": "起動中…",
+    "disconnected": "マネージャーから切断",
+    "unreachable": "マネージャーに接続できません",
+    "notRunning": "マネージャーが実行されていません",
+    "hostNotFound": "マネージャーのホストが見つかりません",
+    "finishingRequests_one": "{count} 件のアクティブなリクエストを完了中",
+    "finishingRequests_other": "{count} 件のアクティブなリクエストを完了中",
+    "working": "実行中 — {serving}/{total}",
+    "loadingModel": "モデルを読み込み中…",
+    "ready": "準備完了",
+    "modelsWarm_one": "{count} モデルがウォーム状態",
+    "modelsWarm_other": "{count} モデルがウォーム状態"
+  },
+  "settings": {
+    "title": "COMRAD 設定",
+    "connection": "接続",
+    "language": "言語",
+    "managerUrl": "マネージャーURL",
+    "managerUrlHelp": "ワーカーがタスクのために接続する COMRAD マネージャーのURL。\n例: http://192.168.1.100:1922",
+    "token": "トークン",
+    "tokenHelp": "マネージャーでのワーカー認証用の秘密トークン。\nマネージャーの設定で確認できます。",
+    "worker": "ワーカー",
+    "memory": "メモリ",
+    "memoryHelp": "モデル読み込みのためにクラスターに割り当てる統合メモリ。\n一般的なモデルサイズ: 7B ≈ 4 GB、13B ≈ 8 GB、70B ≈ 32 GB。",
+    "disk": "ディスク",
+    "diskHelp": "モデルキャッシュの最大ディスク容量。\nワーカーはこの制限を超えるモデルをダウンロードしません。",
+    "p2p": "P2P",
+    "enableP2P": "P2P を有効化",
+    "enableP2PHelp": "P2P 配信により、ノードは外部サーバーから再ダウンロードすることなく\nモデルファイルを直接共有できます。",
+    "port": "ポート",
+    "portHelp": "ノード間の BitTorrent モデルファイル交換用の TCP/UDP ポート。\nインバウンドファイアウォールルールで開くと接続性が向上します。",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "gb": "GB",
+    "system": "システム"
+  },
+  "alert": {
+    "binaryNotFound": "comrad-worker が見つかりません",
+    "binaryNotFoundDetail": "COMRAD.app 内にワーカーバイナリが見つかりませんでした。\n再インストールしてください。",
+    "removePlistTitle": "launchd ジョブファイルを削除しますか？",
+    "removePlistDetail": "COMRAD はメニューバーアプリで管理されるようになりました。\n以下の古い launchd plist は:\n{path}\n削除できます。",
+    "remove": "削除",
+    "keep": "保持"
+  }
+}

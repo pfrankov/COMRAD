@@ -39,11 +39,12 @@ struct LaunchdMigrator {
     }
 
     func offerToRemovePlist() {
+        let loc = Localization.shared
         let alert = NSAlert()
-        alert.messageText = "Remove launchd job file?"
-        alert.informativeText = "COMRAD is now managed by the menu-bar app.\nThe old launchd plist at:\n\(plistPath)\ncan be removed."
-        alert.addButton(withTitle: "Remove")
-        alert.addButton(withTitle: "Keep")
+        alert.messageText = loc.t("alert.removePlistTitle")
+        alert.informativeText = loc.t("alert.removePlistDetail", values: ["path": plistPath])
+        alert.addButton(withTitle: loc.t("alert.remove"))
+        alert.addButton(withTitle: loc.t("alert.keep"))
         if alert.runModal() == .alertFirstButtonReturn {
             try? FileManager.default.removeItem(atPath: plistPath)
         }

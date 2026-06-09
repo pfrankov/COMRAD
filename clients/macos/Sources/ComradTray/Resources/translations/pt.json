@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "startWorker": "Iniciar Worker",
+    "stopWorker": "Parar Worker",
+    "settings": "Configurações…",
+    "openLogs": "Abrir registros",
+    "launchAtLogin": "Iniciar ao fazer login",
+    "idleOnly": "Trabalhar apenas quando ocioso",
+    "quit": "Sair do COMRAD"
+  },
+  "status": {
+    "paused": "Pausado",
+    "macInUse": "Mac em uso — retoma quando ocioso",
+    "notResponding": "Sem resposta",
+    "restarting": "Reiniciando — tentativa {attempt}",
+    "stopped": "Parado",
+    "startingUp": "Iniciando…",
+    "disconnected": "Desconectado do gerenciador",
+    "unreachable": "Gerenciador inacessível",
+    "notRunning": "Gerenciador não está em execução",
+    "hostNotFound": "Host do gerenciador não encontrado",
+    "finishingRequests_one": "Finalizando {count} requisição ativa",
+    "finishingRequests_other": "Finalizando {count} requisições ativas",
+    "working": "Trabalhando — {serving} de {total}",
+    "loadingModel": "Carregando modelo…",
+    "ready": "Pronto",
+    "modelsWarm_one": "{count} modelo aquecido",
+    "modelsWarm_other": "{count} modelos aquecidos"
+  },
+  "settings": {
+    "title": "Configurações do COMRAD",
+    "connection": "Conexão",
+    "language": "Idioma",
+    "managerUrl": "URL do Gerenciador",
+    "managerUrlHelp": "URL do Gerenciador COMRAD ao qual o worker se conecta para tarefas.\nExemplo: http://192.168.1.100:1922",
+    "token": "Token",
+    "tokenHelp": "Token secreto para autorização do worker com o Gerenciador.\nEncontrado nas configurações do Gerenciador.",
+    "worker": "Worker",
+    "memory": "Memória",
+    "memoryHelp": "Memória unificada alocada ao cluster para carregar modelos.\nTamanhos típicos: 7B ≈ 4 GB, 13B ≈ 8 GB, 70B ≈ 32 GB.",
+    "disk": "Disco",
+    "diskHelp": "Espaço máximo em disco para o cache de modelos.\nO worker não baixará modelos que excedam este limite.",
+    "p2p": "P2P",
+    "enableP2P": "Ativar P2P",
+    "enableP2PHelp": "A distribuição P2P permite que os nós compartilhem arquivos de modelo\ndiretamente em vez de baixá-los novamente de servidores externos.",
+    "port": "Porta",
+    "portHelp": "Porta TCP/UDP para troca de arquivos de modelo BitTorrent entre nós.\nAbra-a nas regras de firewall de entrada para melhor conectividade.",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "gb": "GB",
+    "system": "Sistema"
+  },
+  "alert": {
+    "binaryNotFound": "comrad-worker não encontrado",
+    "binaryNotFoundDetail": "Não foi possível localizar o binário do worker dentro do COMRAD.app.\nPor favor, reinstale.",
+    "removePlistTitle": "Remover arquivo de job launchd?",
+    "removePlistDetail": "O COMRAD agora é gerenciado pelo aplicativo da barra de menu.\nO antigo plist launchd em:\n{path}\npode ser removido.",
+    "remove": "Remover",
+    "keep": "Manter"
+  }
+}

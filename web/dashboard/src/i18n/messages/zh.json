@@ -641,6 +641,7 @@
   "value.healthy": "健康",
   "value.offline": "离线",
   "value.online": "在线的",
+  "value.paused": "已暂停",
   "value.quarantined": "被隔离",
   "value.queued": "排队",
   "value.ready": "准备好",

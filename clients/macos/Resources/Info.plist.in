@@ -20,6 +20,8 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>CFBundleIconFile</key>
+    <string>COMRAD</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

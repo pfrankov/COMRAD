@@ -10,6 +10,7 @@ const toneClass: Record<string, string> = {
   running: "border-transparent bg-status-running-bg text-status-running",
   offline: "border-transparent bg-status-offline-bg text-status-offline",
   updating: "border-transparent bg-status-updating-bg text-status-updating",
+  paused: "border-transparent bg-status-paused-bg text-status-paused",
 }
 
 export function StatusBadge({
@@ -49,6 +50,7 @@ function statusLabel(value: string, t: TFunction) {
   if (normalized === "healthy") return t("value.healthy", undefined, "healthy")
   if (normalized === "offline") return t("value.offline", undefined, "offline")
   if (normalized === "online") return t("value.online", undefined, "online")
+  if (normalized === "paused") return t("value.paused", undefined, "paused")
   if (normalized === "quarantined")
     return t("value.quarantined", undefined, "quarantined")
   if (normalized === "queued") return t("value.queued", undefined, "queued")

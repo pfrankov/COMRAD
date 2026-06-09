@@ -55,6 +55,7 @@ export function timeAgo(value?: string, t?: TFunction) {
 
 export function statusTone(status?: string) {
   const value = (status || "").toLowerCase()
+  if (/paused/.test(value)) return "paused"
   if (/ready|online|completed|healthy|true|ok|succeeded|evicted/.test(value))
     return "ready"
   if (/queued|waiting|warming|cached|downloading|loading|expected/.test(value))

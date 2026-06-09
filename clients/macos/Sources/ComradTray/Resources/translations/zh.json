@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "startWorker": "启动工作进程",
+    "stopWorker": "停止工作进程",
+    "settings": "设置…",
+    "openLogs": "打开日志",
+    "launchAtLogin": "登录时启动",
+    "idleOnly": "仅在空闲时工作",
+    "quit": "退出 COMRAD"
+  },
+  "status": {
+    "paused": "已暂停",
+    "macInUse": "Mac 正在使用 — 空闲后恢复",
+    "notResponding": "无响应",
+    "restarting": "正在重启 — 第 {attempt} 次尝试",
+    "stopped": "已停止",
+    "startingUp": "正在启动…",
+    "disconnected": "与管理器断开连接",
+    "unreachable": "管理器无法访问",
+    "notRunning": "管理器未运行",
+    "hostNotFound": "找不到管理器主机",
+    "finishingRequests_one": "正在完成 {count} 个活跃请求",
+    "finishingRequests_other": "正在完成 {count} 个活跃请求",
+    "working": "工作中 — {serving}/{total}",
+    "loadingModel": "正在加载模型…",
+    "ready": "就绪",
+    "modelsWarm_one": "{count} 个模型已预热",
+    "modelsWarm_other": "{count} 个模型已预热"
+  },
+  "settings": {
+    "title": "COMRAD 设置",
+    "connection": "连接",
+    "language": "语言",
+    "managerUrl": "管理器 URL",
+    "managerUrlHelp": "工作进程连接以获取任务的 COMRAD 管理器 URL。\n示例：http://192.168.1.100:1922",
+    "token": "令牌",
+    "tokenHelp": "用于工作进程向管理器授权的密钥令牌。\n在管理器设置中查找。",
+    "worker": "工作进程",
+    "memory": "内存",
+    "memoryHelp": "分配给集群用于加载模型的统一内存。\n典型模型大小：7B ≈ 4 GB，13B ≈ 8 GB，70B ≈ 32 GB。",
+    "disk": "磁盘",
+    "diskHelp": "模型缓存的最大磁盘空间。\n工作进程不会下载超过此限制的模型。",
+    "p2p": "P2P",
+    "enableP2P": "启用 P2P",
+    "enableP2PHelp": "P2P 分发让节点可以直接共享模型文件，\n而无需从外部服务器重新下载。",
+    "port": "端口",
+    "portHelp": "节点之间 BitTorrent 模型文件交换的 TCP/UDP 端口。\n在入站防火墙规则中打开它以获得更好的连接性。",
+    "cancel": "取消",
+    "save": "保存",
+    "gb": "GB",
+    "system": "系统"
+  },
+  "alert": {
+    "binaryNotFound": "未找到 comrad-worker",
+    "binaryNotFoundDetail": "无法在 COMRAD.app 中找到工作进程二进制文件。\n请重新安装。",
+    "removePlistTitle": "删除 launchd 任务文件？",
+    "removePlistDetail": "COMRAD 现在由菜单栏应用管理。\n可以删除位于以下位置的旧 launchd plist：\n{path}",
+    "remove": "删除",
+    "keep": "保留"
+  }
+}

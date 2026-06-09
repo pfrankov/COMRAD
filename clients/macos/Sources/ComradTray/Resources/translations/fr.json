@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "startWorker": "Démarrer le Worker",
+    "stopWorker": "Arrêter le Worker",
+    "settings": "Paramètres…",
+    "openLogs": "Ouvrir les journaux",
+    "launchAtLogin": "Lancer à l'ouverture de session",
+    "idleOnly": "Travailler uniquement en inactivité",
+    "quit": "Quitter COMRAD"
+  },
+  "status": {
+    "paused": "En pause",
+    "macInUse": "Mac utilisé — reprend quand inactif",
+    "notResponding": "Ne répond pas",
+    "restarting": "Redémarrage — tentative {attempt}",
+    "stopped": "Arrêté",
+    "startingUp": "Démarrage…",
+    "disconnected": "Déconnecté du gestionnaire",
+    "unreachable": "Le gestionnaire est inaccessible",
+    "notRunning": "Le gestionnaire ne tourne pas",
+    "hostNotFound": "Hôte du gestionnaire introuvable",
+    "finishingRequests_one": "Finalisation de {count} requête active",
+    "finishingRequests_other": "Finalisation de {count} requêtes actives",
+    "working": "En cours — {serving} sur {total}",
+    "loadingModel": "Chargement du modèle…",
+    "ready": "Prêt",
+    "modelsWarm_one": "{count} modèle chaud",
+    "modelsWarm_other": "{count} modèles chauds"
+  },
+  "settings": {
+    "title": "Paramètres COMRAD",
+    "connection": "Connexion",
+    "language": "Langue",
+    "managerUrl": "URL du Manager",
+    "managerUrlHelp": "URL du Manager COMRAD auquel le worker se connecte pour les tâches.\nExemple : http://192.168.1.100:1922",
+    "token": "Jeton",
+    "tokenHelp": "Jeton secret pour l'autorisation du worker auprès du Manager.\nSe trouve dans les paramètres du Manager.",
+    "worker": "Worker",
+    "memory": "Mémoire",
+    "memoryHelp": "Mémoire unifiée allouée au cluster pour charger les modèles.\nTailles typiques : 7B ≈ 4 Go, 13B ≈ 8 Go, 70B ≈ 32 Go.",
+    "disk": "Disque",
+    "diskHelp": "Espace disque maximal pour le cache de modèles.\nLe worker ne téléchargera pas les modèles dépassant cette limite.",
+    "p2p": "P2P",
+    "enableP2P": "Activer le P2P",
+    "enableP2PHelp": "La distribution P2P permet aux nœuds de partager directement les fichiers\nde modèles au lieu de les télécharger à nouveau depuis des serveurs externes.",
+    "port": "Port",
+    "portHelp": "Port TCP/UDP pour l'échange de fichiers de modèles BitTorrent entre nœuds.\nOuvrez-le dans les règles de pare-feu entrant pour une meilleure connectivité.",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "gb": "Go",
+    "system": "Système"
+  },
+  "alert": {
+    "binaryNotFound": "comrad-worker introuvable",
+    "binaryNotFoundDetail": "Impossible de localiser le binaire du worker dans COMRAD.app.\nVeuillez réinstaller.",
+    "removePlistTitle": "Supprimer le fichier de tâche launchd ?",
+    "removePlistDetail": "COMRAD est désormais géré par l'application de la barre de menus.\nL'ancien plist launchd à :\n{path}\npeut être supprimé.",
+    "remove": "Supprimer",
+    "keep": "Conserver"
+  }
+}

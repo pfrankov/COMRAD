@@ -6,7 +6,7 @@ final class SettingsTests: XCTestCase {
     private func tempStore() -> SettingsStore {
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("comrad-test-\(UUID().uuidString).json")
-        return SettingsStore(fileURL: url, keychainAccount: "comrad-test-\(UUID().uuidString)")
+        return SettingsStore(fileURL: url)
     }
 
     func testEncodeDecodeRoundTrip() throws {
@@ -19,6 +19,7 @@ final class SettingsTests: XCTestCase {
         s.nodeID = "node-test"
         s.nodeName = "test-machine"
         s.idleOnlyMode = true
+        s.token = "round-trip-token"
 
         try store.save(s)
         let loaded = store.load()
@@ -30,6 +31,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(loaded.nodeID, s.nodeID)
         XCTAssertEqual(loaded.nodeName, s.nodeName)
         XCTAssertEqual(loaded.idleOnlyMode, s.idleOnlyMode)
+        XCTAssertEqual(loaded.token, s.token)
     }
 
     func testDefaultValuesAreSane() {
@@ -38,6 +40,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertGreaterThan(s.statusPort, 0)
         XCTAssertFalse(s.disableP2P)
         XCTAssertFalse(s.idleOnlyMode)
+        XCTAssertTrue(s.token.isEmpty)
     }
 
     func testIdleOnlyModeDefaultsToFalse() {
@@ -52,15 +55,16 @@ final class SettingsTests: XCTestCase {
         try? json.write(to: url)
         let loaded = SettingsStore(fileURL: url).load()
         XCTAssertFalse(loaded.idleOnlyMode, "idleOnlyMode must default to false for old settings files")
+        XCTAssertTrue(loaded.token.isEmpty, "token must default to empty for old settings files")
     }
 
-    func testTokenNotInSerializedJSON() throws {
+    func testTokenRoundTrip() throws {
         let store = tempStore()
-        let s = Settings()
+        var s = Settings()
+        s.token = "secret-token-\(UUID().uuidString)"
         try store.save(s)
-        let data = try Data(contentsOf: store.fileURL)
-        let json = String(data: data, encoding: .utf8) ?? ""
-        XCTAssertFalse(json.contains("token"), "token must not appear in settings JSON: \(json)")
+        let loaded = store.load()
+        XCTAssertEqual(loaded.token, s.token)
     }
 
     func testEnvVarsMapsAllSettings() {
@@ -71,9 +75,9 @@ final class SettingsTests: XCTestCase {
         s.disableP2P = true
         s.nodeID = "n1"
         s.nodeName = "my-machine"
-        let token = "secret-token"
+        s.token = "secret-token"
 
-        let env = s.envVars(token: token)
+        let env = s.envVars()
 
         XCTAssertEqual(env["COMRAD_MANAGER_URL"], "http://manager:9000")
         XCTAssertEqual(env["COMRAD_WORKER_SLOTS"], "1")
@@ -89,7 +93,7 @@ final class SettingsTests: XCTestCase {
         var s = Settings()
         s.memoryGB = 8
         s.diskGB = 100
-        let env = s.envVars(token: "")
+        let env = s.envVars()
         XCTAssertEqual(env["COMRAD_WORKER_UNIFIED_BYTES"], "\(8 * (1 << 30))")
         XCTAssertEqual(env["COMRAD_WORKER_RAM_BYTES"],     "\(8 * (1 << 30))")
         XCTAssertEqual(env["COMRAD_WORKER_DISK_BYTES"],    "\(100 * (1 << 30))")
@@ -100,13 +104,5 @@ final class SettingsTests: XCTestCase {
         let s = store.load()
         XCTAssertFalse(s.managerURL.isEmpty)
         XCTAssertGreaterThan(s.statusPort, 0)
-    }
-
-    func testKeychainRoundTrip() throws {
-        let store = tempStore()
-        let originalToken = "test-keychain-token-\(UUID().uuidString)"
-        try store.saveToken(originalToken)
-        let loaded = store.loadToken()
-        XCTAssertEqual(loaded, originalToken)
     }
 }
