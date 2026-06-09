@@ -694,9 +694,11 @@
   "common.copy": "コピー",
   "common.hide": "非表示",
   "common.show": "表示",
-  "settings.clientKey.title": "クライアントキー",
-  "settings.clientKey.description": "このキーをクライアントと共有して、このManagerに接続できるようにします。",
+  "settings.clientKey.title": "クライアント接続",
+  "settings.clientKey.description": "クライアントがこのManagerに接続できるよう、これらの情報を共有してください。",
   "settings.clientKey.loading": "読み込み中…",
   "settings.clientKey.error": "読み込み失敗",
-  "settings.clientKey.noToken": "管理者トークンを保存してクライアントキーを表示してください。"
+  "settings.clientKey.noToken": "管理者トークンを保存してクライアント接続情報を表示してください。",
+  "settings.clientKey.urlLabel": "Manager URL",
+  "settings.clientKey.keyLabel": "APIキー"
 }

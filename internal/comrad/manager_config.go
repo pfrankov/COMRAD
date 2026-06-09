@@ -87,7 +87,10 @@ func (m *Manager) handleAdminClientKey(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"clientKey": m.cfg.ClientAPIKey})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"clientKey":  m.cfg.ClientAPIKey,
+		"managerUrl": m.baseURL(r),
+	})
 }
 
 func (m *Manager) handleAdminConfigYAML(w http.ResponseWriter, r *http.Request) {

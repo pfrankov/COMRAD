@@ -430,20 +430,26 @@ function ClientKeyCard({
 }) {
   const { t } = useI18n()
   const [key, setKey] = useState<string | null>(null)
+  const [managerUrl, setManagerUrl] = useState<string | null>(null)
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copiedUrl, setCopiedUrl] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     setKey(null)
+    setManagerUrl(null)
     setVisible(false)
     setError("")
     if (!adminToken) return
     setLoading(true)
     actions
-      .fetchJSON<{ clientKey: string }>("/api/admin/client-key")
-      .then((body) => setKey(body.clientKey))
+      .fetchJSON<{ clientKey: string; managerUrl: string }>("/api/admin/client-key")
+      .then((body) => {
+        setKey(body.clientKey)
+        setManagerUrl(body.managerUrl)
+      })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false))
   }, [actions, adminToken])
@@ -455,7 +461,14 @@ function ClientKeyCard({
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const displayValue = !adminToken
+  const handleCopyUrl = async () => {
+    if (!managerUrl) return
+    await navigator.clipboard.writeText(managerUrl)
+    setCopiedUrl(true)
+    setTimeout(() => setCopiedUrl(false), 2000)
+  }
+
+  const displayKey = !adminToken
     ? ""
     : loading
       ? t("settings.clientKey.loading", undefined, "Loading…")
@@ -472,13 +485,13 @@ function ClientKeyCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <KeyRoundIcon data-icon="inline-start" />
-          {t("settings.clientKey.title", undefined, "Client key")}
+          {t("settings.clientKey.title", undefined, "Client connection")}
         </CardTitle>
         <CardDescription>
           {t(
             "settings.clientKey.description",
             undefined,
-            "Share this key with clients so they can connect to this Manager."
+            "Share these with clients so they can connect to this Manager."
           )}
         </CardDescription>
       </CardHeader>
@@ -488,47 +501,80 @@ function ClientKeyCard({
             {t(
               "settings.clientKey.noToken",
               undefined,
-              "Save the admin token to reveal the client key."
+              "Save the admin token to reveal client connection details."
             )}
           </p>
         ) : (
           <>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs">
-                {displayValue}
-              </code>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                disabled={!key}
-                onClick={() => setVisible((v) => !v)}
-                aria-label={
-                  visible
-                    ? t("common.hide", undefined, "Hide")
-                    : t("common.show", undefined, "Show")
-                }
-              >
-                {visible ? (
-                  <EyeOffIcon className="size-4" />
-                ) : (
-                  <EyeIcon className="size-4" />
-                )}
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                disabled={!key}
-                onClick={() => void handleCopy()}
-                aria-label={t("common.copy", undefined, "Copy")}
-              >
-                {copied ? (
-                  <CheckIcon className="size-4 text-status-running" />
-                ) : (
-                  <CopyIcon className="size-4" />
-                )}
-              </Button>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">
+                {t("settings.clientKey.urlLabel", undefined, "Manager URL")}
+              </span>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs">
+                  {loading
+                    ? t("settings.clientKey.loading", undefined, "Loading…")
+                    : error
+                      ? t("settings.clientKey.error", undefined, "Failed to load")
+                      : (managerUrl ?? "")}
+                </code>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  disabled={!managerUrl}
+                  onClick={() => void handleCopyUrl()}
+                  aria-label={t("common.copy", undefined, "Copy")}
+                >
+                  {copiedUrl ? (
+                    <CheckIcon className="size-4 text-status-running" />
+                  ) : (
+                    <CopyIcon className="size-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">
+                {t("settings.clientKey.keyLabel", undefined, "API key")}
+              </span>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs">
+                  {displayKey}
+                </code>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  disabled={!key}
+                  onClick={() => setVisible((v) => !v)}
+                  aria-label={
+                    visible
+                      ? t("common.hide", undefined, "Hide")
+                      : t("common.show", undefined, "Show")
+                  }
+                >
+                  {visible ? (
+                    <EyeOffIcon className="size-4" />
+                  ) : (
+                    <EyeIcon className="size-4" />
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  disabled={!key}
+                  onClick={() => void handleCopy()}
+                  aria-label={t("common.copy", undefined, "Copy")}
+                >
+                  {copied ? (
+                    <CheckIcon className="size-4 text-status-running" />
+                  ) : (
+                    <CopyIcon className="size-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </>
         )}

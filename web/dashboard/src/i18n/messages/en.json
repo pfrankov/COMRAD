@@ -694,9 +694,11 @@
   "common.copy": "Copy",
   "common.hide": "Hide",
   "common.show": "Show",
-  "settings.clientKey.title": "Client key",
-  "settings.clientKey.description": "Share this key with clients so they can connect to this Manager.",
+  "settings.clientKey.title": "Client connection",
+  "settings.clientKey.description": "Share these with clients so they can connect to this Manager.",
   "settings.clientKey.loading": "Loading…",
   "settings.clientKey.error": "Failed to load",
-  "settings.clientKey.noToken": "Save the admin token to reveal the client key."
+  "settings.clientKey.noToken": "Save the admin token to reveal client connection details.",
+  "settings.clientKey.urlLabel": "Manager URL",
+  "settings.clientKey.keyLabel": "API key"
 }

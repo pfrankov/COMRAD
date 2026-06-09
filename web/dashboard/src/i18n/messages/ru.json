@@ -694,9 +694,11 @@
   "common.copy": "Копировать",
   "common.hide": "Скрыть",
   "common.show": "Показать",
-  "settings.clientKey.title": "Ключ клиента",
-  "settings.clientKey.description": "Передайте этот ключ клиентам, чтобы они могли подключиться к этому менеджеру.",
+  "settings.clientKey.title": "Подключение клиентов",
+  "settings.clientKey.description": "Передайте эти данные клиентам для подключения к менеджеру.",
   "settings.clientKey.loading": "Загрузка…",
   "settings.clientKey.error": "Не удалось загрузить",
-  "settings.clientKey.noToken": "Сохраните токен администратора, чтобы показать ключ клиента."
+  "settings.clientKey.noToken": "Сохраните токен администратора, чтобы показать данные подключения.",
+  "settings.clientKey.urlLabel": "URL менеджера",
+  "settings.clientKey.keyLabel": "API-ключ"
 }

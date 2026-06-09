@@ -694,9 +694,11 @@
   "common.copy": "Copiar",
   "common.hide": "Ocultar",
   "common.show": "Mostrar",
-  "settings.clientKey.title": "Clave de cliente",
-  "settings.clientKey.description": "Comparte esta clave con los clientes para que puedan conectarse a este Manager.",
+  "settings.clientKey.title": "Conexión de cliente",
+  "settings.clientKey.description": "Comparte estos datos con los clientes para que puedan conectarse a este Manager.",
   "settings.clientKey.loading": "Cargando…",
   "settings.clientKey.error": "Error al cargar",
-  "settings.clientKey.noToken": "Guarda el token de administrador para revelar la clave de cliente."
+  "settings.clientKey.noToken": "Guarda el token de administrador para revelar los datos de conexión del cliente.",
+  "settings.clientKey.urlLabel": "URL del Manager",
+  "settings.clientKey.keyLabel": "Clave API"
 }
